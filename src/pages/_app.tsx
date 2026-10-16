@@ -4,6 +4,8 @@ import { SessionProvider } from "next-auth/react";
 
 import { api } from "~/utils/api";
 
+import "@fontsource-variable/inter";
+import "@fontsource-variable/bricolage-grotesque/opsz.css";
 import "~/styles/globals.css";
 
 const MyApp: AppType<{ session: Session | null }> = ({

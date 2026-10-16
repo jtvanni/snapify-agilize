@@ -1,53 +1,55 @@
 import { Menu, Transition } from "@headlessui/react";
-import { Fragment } from "react";
-import { signOut, useSession } from "next-auth/react";
-import defaultProfileIcon from "~/assets/default profile icon.jpg";
 import Image from "next/image";
+import { signOut, useSession } from "next-auth/react";
+import { LogOut } from "lucide-react";
+import { Fragment } from "react";
+
+import defaultProfileIcon from "~/assets/default profile icon.jpg";
 
 export default function ProfileMenu() {
   const { data: session } = useSession();
 
-  const handleSignOut = () => {
-    void signOut();
-  };
-
   return (
     <Menu as="div" className="relative inline-block text-left">
-      <Menu.Button className="flex rounded-full bg-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-gray-800">
-        <span className="sr-only">Open user menu</span>
+      <Menu.Button className="flex rounded-full transition-transform duration-150 ease-out active:scale-[0.97] focus:outline-none focus-visible:ring-2 focus-visible:ring-navy-600 focus-visible:ring-offset-2">
+        <span className="sr-only">Abrir menu do usuário</span>
         <Image
-          className="h-8 w-8 rounded-full"
+          className="h-9 w-9 rounded-full border border-line object-cover"
           src={session?.user?.image ?? defaultProfileIcon}
-          alt="profile icon"
-          width={32}
-          height={32}
+          alt={`Foto de ${session?.user?.name ?? "usuário"}`}
+          width={36}
+          height={36}
           unoptimized
         />
       </Menu.Button>
       <Transition
         as={Fragment}
-        enter="transition ease-out duration-100"
-        enterFrom="transform opacity-0 scale-95"
-        enterTo="transform opacity-100 scale-100"
-        leave="transition ease-in duration-75"
-        leaveFrom="transform opacity-100 scale-100"
-        leaveTo="transform opacity-0 scale-95"
+        enter="transition duration-150 ease-out"
+        enterFrom="translate-y-1 opacity-0 scale-[0.97]"
+        enterTo="translate-y-0 opacity-100 scale-100"
+        leave="transition duration-100 ease-out"
+        leaveFrom="translate-y-0 opacity-100 scale-100"
+        leaveTo="translate-y-1 opacity-0 scale-[0.97]"
       >
-        <Menu.Items className="absolute right-0 z-10 mt-2 origin-top-right divide-y divide-gray-100 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-          <div className="px-1 py-1 ">
-            <Menu.Item>
-              {({ active }) => (
-                <div
-                  onClick={handleSignOut}
-                  className={`mx-2 flex h-8 w-40 cursor-pointer flex-row content-center rounded-md p-2 ${
-                    active ? "bg-gray-100" : ""
-                  }`}
-                >
-                  <p className="leading-2 text-sm leading-4">Sign out</p>
-                </div>
-              )}
-            </Menu.Item>
-          </div>
+        <Menu.Items className="absolute right-0 z-40 mt-2 w-52 origin-top-right border border-line bg-white p-1 shadow-lg focus:outline-none">
+          {session?.user?.name ? (
+            <div className="border-b border-line px-3 py-2">
+              <p className="truncate text-xs text-muted-foreground">Conectado como</p>
+              <p className="truncate text-sm font-semibold text-navy-900">{session.user.name}</p>
+            </div>
+          ) : null}
+          <Menu.Item>
+            {({ active }) => (
+              <button
+                type="button"
+                onClick={() => void signOut()}
+                className={`flex w-full items-center gap-3 px-3 py-2 text-left text-sm font-medium text-navy-900 ${active ? "bg-navy-50" : ""}`}
+              >
+                <LogOut className="h-4 w-4 text-navy-600" aria-hidden="true" />
+                Sair
+              </button>
+            )}
+          </Menu.Item>
         </Menu.Items>
       </Transition>
     </Menu>

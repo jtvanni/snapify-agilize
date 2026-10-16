@@ -1,70 +1,65 @@
 import { Menu, Transition } from "@headlessui/react";
-import { Fragment } from "react";
-import uploadVideoModalOpen from "~/atoms/uploadVideoModalOpen";
 import { useAtom } from "jotai";
+import { ChevronDown, MonitorUp, Plus, Video } from "lucide-react";
+import { Fragment } from "react";
+
 import recordVideoModalOpen from "~/atoms/recordVideoModalOpen";
+import uploadVideoModalOpen from "~/atoms/uploadVideoModalOpen";
+import { buttonVariants } from "~/components/ui/Button";
 
 export default function NewVideoMenu() {
   const [, setRecordOpen] = useAtom(recordVideoModalOpen);
   const [, setUploadOpen] = useAtom(uploadVideoModalOpen);
 
   const openRecordModal = () => {
-    if (
-      !navigator?.mediaDevices?.getDisplayMedia &&
-      !navigator?.mediaDevices?.getDisplayMedia
-    ) {
-      return alert("Your browser is currently NOT supported.");
+    if (!navigator?.mediaDevices?.getDisplayMedia) {
+      return alert("Seu navegador não oferece suporte à gravação de tela.");
     }
     setRecordOpen(true);
   };
 
-  const openUploadModal = () => {
-    setUploadOpen(true);
-  };
-
   return (
     <Menu as="div" className="relative inline-block text-left">
-      <Menu.Button>
-        <span className="cursor-pointer rounded border border-[#0000001a] px-2 py-2 text-sm text-[#292d34] hover:bg-[#fafbfc]">
-          New video
-        </span>
+      <Menu.Button className={buttonVariants({ variant: "signal", size: "sm" })}>
+        <Plus className="h-4 w-4" aria-hidden="true" />
+        <span className="hidden sm:inline">Nova demonstração</span>
+        <span className="sm:hidden">Nova</span>
+        <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
       </Menu.Button>
       <Transition
         as={Fragment}
-        enter="transition ease-out duration-100"
-        enterFrom="transform opacity-0 scale-95"
-        enterTo="transform opacity-100 scale-100"
-        leave="transition ease-in duration-75"
-        leaveFrom="transform opacity-100 scale-100"
-        leaveTo="transform opacity-0 scale-95"
+        enter="transition duration-150 ease-out"
+        enterFrom="translate-y-1 opacity-0 scale-[0.97]"
+        enterTo="translate-y-0 opacity-100 scale-100"
+        leave="transition duration-100 ease-out"
+        leaveFrom="translate-y-0 opacity-100 scale-100"
+        leaveTo="translate-y-1 opacity-0 scale-[0.97]"
       >
-        <Menu.Items className="absolute right-0 z-10 mt-2 origin-top-right divide-y divide-gray-100 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-          <div className="px-1 py-1 ">
-            <Menu.Item>
-              {({ active }) => (
-                <div
-                  onClick={openRecordModal}
-                  className={`mx-2 flex h-8 w-40 cursor-pointer flex-row content-center rounded-md p-2 ${
-                    active ? "bg-gray-100" : ""
-                  }`}
-                >
-                  <p className="leading-2 text-sm leading-4">Record a video</p>
-                </div>
-              )}
-            </Menu.Item>
-            <Menu.Item>
-              {({ active }) => (
-                <div
-                  onClick={openUploadModal}
-                  className={`mx-2 flex h-8 w-40 cursor-pointer flex-row content-center rounded-md p-2 ${
-                    active ? "bg-gray-100" : ""
-                  }`}
-                >
-                  <p className="leading-2 text-sm leading-4">Upload a video</p>
-                </div>
-              )}
-            </Menu.Item>
-          </div>
+        <Menu.Items className="absolute right-0 z-40 mt-2 w-56 origin-top-right border border-line bg-white p-1 shadow-lg focus:outline-none">
+          <Menu.Item>
+            {({ active }) => (
+              <button
+                type="button"
+                onClick={openRecordModal}
+                className={`flex w-full items-center gap-3 px-3 py-2 text-left text-sm font-medium text-navy-900 ${active ? "bg-navy-50" : ""}`}
+              >
+                <Video className="h-4 w-4 text-navy-600" aria-hidden="true" />
+                Gravar a tela
+              </button>
+            )}
+          </Menu.Item>
+          <Menu.Item>
+            {({ active }) => (
+              <button
+                type="button"
+                onClick={() => setUploadOpen(true)}
+                className={`flex w-full items-center gap-3 px-3 py-2 text-left text-sm font-medium text-navy-900 ${active ? "bg-navy-50" : ""}`}
+              >
+                <MonitorUp className="h-4 w-4 text-navy-600" aria-hidden="true" />
+                Enviar um vídeo
+              </button>
+            )}
+          </Menu.Item>
         </Menu.Items>
       </Transition>
     </Menu>

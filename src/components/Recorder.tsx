@@ -1,13 +1,21 @@
-import React, { useState, useRef, Fragment, useEffect } from "react";
+import { useState, useRef, Fragment, useEffect } from "react";
 import RecordRTC, { invokeSaveAsDialog } from "recordrtc";
 import { Listbox, Transition } from "@headlessui/react";
-import { CheckIcon, ChevronUpDownIcon } from "@heroicons/react/20/solid";
-import { MicrophoneIcon, PauseIcon } from "@heroicons/react/24/outline";
-import { ResumeIcon, TrashIcon } from "@radix-ui/react-icons";
-import { StopIcon } from "@heroicons/react/24/solid";
+import {
+  Check,
+  ChevronsUpDown,
+  CloudUpload,
+  Download,
+  Loader2,
+  Mic,
+  Pause,
+  Play,
+  Square,
+  Trash2,
+  X,
+} from "lucide-react";
 import StopTime from "~/components/StopTime";
 import axios from "axios";
-import dayjs from "dayjs";
 import { useRouter } from "next/router";
 import { api } from "~/utils/api";
 import { TRPCClientError } from "@trpc/client";
@@ -17,6 +25,7 @@ import Tooltip from "~/components/Tooltip";
 import generateThumbnail from "~/utils/generateThumbnail";
 import * as EBML from "ts-ebml";
 import VideoPlayer from "~/components/VideoPlayer";
+import { Button } from "~/components/ui/Button";
 
 interface Props {
   closeModal: () => void;
@@ -47,6 +56,17 @@ export default function Recorder({ closeModal, step, setStep }: Props) {
   const abortUpload = api.video.abortUpload.useMutation();
   const [duration, setDuration] = useState<number>(0);
   const videoRef = useRef<null | HTMLVideoElement>(null);
+  const [previewUrl, setPreviewUrl] = useState<string>();
+
+  useEffect(() => {
+    if (!blob) {
+      setPreviewUrl(undefined);
+      return;
+    }
+    const url = URL.createObjectURL(blob);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [blob]);
 
   const handleRecording = async () => {
     const screenStream = await navigator.mediaDevices.getDisplayMedia({
@@ -68,8 +88,7 @@ export default function Recorder({ closeModal, step, setStep }: Props) {
         audio: { deviceId: selectedDevice?.deviceId },
       });
     } catch (error) {
-      // Handle the case where microphone permissions are not granted
-      console.error("Failed to access microphone:", error);
+      console.error("Não foi possível acessar o microfone:", error);
     }
 
     const mediaStream = new MediaStream();
@@ -144,14 +163,14 @@ export default function Recorder({ closeModal, step, setStep }: Props) {
   };
 
   const handleDelete = () => {
-    if (recorderRef.current === null) return;
     setBlob(null);
-    recorderRef.current.stopRecording(() => {
-      steam?.getTracks().map((track) => track.stop());
-    });
-
+    steam?.getTracks().forEach((track) => track.stop());
+    if (step === "in" && recorderRef.current) {
+      recorderRef.current.stopRecording();
+    }
+    setPause(false);
+    setDuration(0);
     closeModal();
-    setStep("pre");
   };
 
   const handlePause = () => {
@@ -190,8 +209,7 @@ export default function Recorder({ closeModal, step, setStep }: Props) {
 
   const handleSave = () => {
     if (blob) {
-      const dateString =
-        "Snapify Recording - " + dayjs().format("D MMM YYYY") + ".webm";
+      const dateString = getRecordingFileName();
       invokeSaveAsDialog(blob, dateString);
     }
   };
@@ -199,8 +217,7 @@ export default function Recorder({ closeModal, step, setStep }: Props) {
   const handleUpload = async () => {
     if (!blob || !videoRef.current) return;
 
-    const dateString =
-      "Snapify Recording - " + dayjs().format("D MMM YYYY") + ".webm";
+    const dateString = getRecordingFileName();
     setSubmitting(true);
     let videoId: string | undefined;
 
@@ -230,7 +247,7 @@ export default function Recorder({ closeModal, step, setStep }: Props) {
         if (err.message === "UNAUTHORIZED") {
           window.open(
             `/sign-in?redirect=${encodeURIComponent("/window-close")}`,
-            "Sign In",
+            "Entrar",
             "width=500,height=500"
           );
         }
@@ -245,43 +262,49 @@ export default function Recorder({ closeModal, step, setStep }: Props) {
   };
 
   return (
-    <div>
+    <div className="w-full">
       {step === "pre" ? (
-        <div className="w-full">
+        <div className="mx-auto w-full max-w-lg">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold text-navy-600">Nova demonstração</p>
+              <h2 className="mt-1 text-2xl font-bold text-navy-900">Gravar a tela</h2>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                Escolha o microfone e, em seguida, selecione a tela ou janela que deseja compartilhar.
+              </p>
+            </div>
+            <Button type="button" variant="ghost" size="icon" onClick={closeModal} aria-label="Fechar">
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
+          <label className="mt-6 block text-sm font-semibold text-navy-900">Microfone</label>
           <Listbox value={selectedDevice} onChange={setSelectedDevice}>
-            <div className="relative mt-1">
-              <Listbox.Button className="relative flex w-full cursor-default flex-row items-center justify-start rounded-lg bg-white py-2 pl-3 pr-10 text-left shadow-md focus:outline-none focus-visible:border-indigo-500 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75 focus-visible:ring-offset-2 sm:text-sm">
-                <MicrophoneIcon
-                  className="mr-2 h-5 w-5 text-gray-400"
-                  aria-hidden="true"
-                />
+            <div className="relative mt-2">
+              <Listbox.Button className="relative flex h-11 w-full cursor-default items-center border border-line bg-white py-2 pl-3 pr-10 text-left text-sm text-navy-900 hover:bg-navy-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-navy-600 focus-visible:ring-offset-2">
+                <Mic className="mr-2 h-5 w-5 text-navy-600" aria-hidden="true" />
                 <span className="block truncate">
-                  {selectedDevice?.label ?? "No device selected"}
-                  {selectedDevice?.label === "" ? "Enabled" : null}
+                  {selectedDevice?.label || "Microfone padrão"}
                 </span>
                 <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-                  <ChevronUpDownIcon
-                    className="h-5 w-5 text-gray-400"
-                    aria-hidden="true"
-                  />
+                  <ChevronsUpDown className="h-4 w-4 text-navy-600" aria-hidden="true" />
                 </span>
               </Listbox.Button>
               <Transition
                 as={Fragment}
-                enter="ease-out duration-300"
-                enterFrom="opacity-0"
-                enterTo="opacity-100"
-                leave="ease-in duration-200"
-                leaveFrom="opacity-100"
-                leaveTo="opacity-0"
+                enter="transition duration-150 ease-out"
+                enterFrom="translate-y-1 opacity-0 scale-[0.97]"
+                enterTo="translate-y-0 opacity-100 scale-100"
+                leave="transition duration-100 ease-out"
+                leaveFrom="translate-y-0 opacity-100 scale-100"
+                leaveTo="translate-y-1 opacity-0 scale-[0.97]"
               >
-                <Listbox.Options className="absolute mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
+                <Listbox.Options className="absolute z-20 mt-1 max-h-60 w-full overflow-auto border border-line bg-white p-1 text-sm shadow-lg focus:outline-none">
                   {audioDevices.map((audioDevice, i) => (
                     <Listbox.Option
                       key={i}
                       className={({ active }) =>
-                        `relative cursor-default select-none py-2 pl-10 pr-4 text-gray-900 ${
-                          active ? "bg-gray-200" : ""
+                        `relative cursor-pointer select-none py-2 pl-9 pr-4 text-navy-900 ${
+                          active ? "bg-navy-50" : ""
                         }`
                       }
                       value={audioDevice}
@@ -296,11 +319,8 @@ export default function Recorder({ closeModal, step, setStep }: Props) {
                             {audioDevice.label}
                           </span>
                           {selected ? (
-                            <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-amber-600">
-                              <CheckIcon
-                                className="h-5 w-5"
-                                aria-hidden="true"
-                              />
+                            <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-navy-600">
+                              <Check className="h-4 w-4" aria-hidden="true" />
                             </span>
                           ) : null}
                         </>
@@ -311,123 +331,116 @@ export default function Recorder({ closeModal, step, setStep }: Props) {
               </Transition>
             </div>
           </Listbox>
-          <button
+          <Button
             type="button"
-            className="mt-4 inline-flex w-full items-center justify-center rounded-md bg-indigo-500 px-4 py-2 text-sm font-semibold leading-6 text-white shadow transition duration-150 ease-in-out hover:bg-indigo-400 disabled:cursor-not-allowed"
+            className="mt-6 w-full"
             onClick={() => void handleRecording()}
           >
-            <span>Start recording</span>
-          </button>
+            <Square className="h-4 w-4 fill-signal text-signal" />
+            Iniciar gravação
+          </Button>
         </div>
       ) : null}
       {step === "in" ? (
-        <div className="flex flex-row items-center justify-center">
-          <Tooltip title="Finish recording">
-            <div
+        <div className="flex flex-col items-center py-8">
+          <p className="text-sm font-semibold text-navy-600">Gravação em andamento</p>
+          <div className="mt-5 flex items-center border border-line bg-navy-50 p-2">
+          <Tooltip title="Finalizar gravação">
+            <button
+              type="button"
               onClick={handleStop}
-              className="flex cursor-pointer flex-row items-center justify-center rounded pr-2 text-lg hover:bg-gray-200"
+              className="flex h-10 items-center gap-2 px-3 text-lg font-semibold text-navy-900 transition-colors hover:bg-white"
             >
-              <StopIcon className="h-8 w-8 text-[#ff623f]" aria-hidden="true" />
+              <Square className="h-5 w-5 fill-destructive text-destructive" aria-hidden="true" />
               <StopTime
                 running={!pause}
                 duration={duration}
                 setDuration={setDuration}
               />
-            </div>
+            </button>
           </Tooltip>
-          <div className="mx-2 h-6 w-px bg-[#E7E9EB]"></div>
-          <Tooltip title={pause ? "Resume" : "Pause"}>
-            <div
+          <div className="mx-1 h-6 w-px bg-line" />
+          <Tooltip title={pause ? "Retomar" : "Pausar"}>
+            <button
+              type="button"
               onClick={handlePause}
-              className="cursor-pointer rounded p-1 hover:bg-gray-200"
+              className="grid h-10 w-10 place-items-center text-navy-600 transition-colors hover:bg-white"
             >
               {pause ? (
-                <ResumeIcon
-                  className="h-6 w-6 text-gray-400"
-                  aria-hidden="true"
-                />
+                <Play className="h-5 w-5" aria-hidden="true" />
               ) : (
-                <PauseIcon
-                  className="h-6 w-6 text-gray-400"
-                  aria-hidden="true"
-                />
+                <Pause className="h-5 w-5" aria-hidden="true" />
               )}
-            </div>
+            </button>
           </Tooltip>
-          <Tooltip title="Cancel recording">
-            <div
+          <Tooltip title="Cancelar gravação">
+            <button
+              type="button"
               onClick={handleDelete}
-              className="ml-1 cursor-pointer rounded p-1 hover:bg-gray-200"
+              className="grid h-10 w-10 place-items-center text-destructive transition-colors hover:bg-red-50"
             >
-              <TrashIcon className="h-6 w-6 text-gray-400" aria-hidden="true" />
-            </div>
+              <Trash2 className="h-5 w-5" aria-hidden="true" />
+            </button>
           </Tooltip>
+          </div>
+          <p className="mt-4 text-xs text-muted-foreground">
+            Volte a esta janela para pausar ou finalizar.
+          </p>
         </div>
       ) : null}
       {step === "post" ? (
         <div>
-          {blob ? (
-            <div className="mb-3 aspect-video max-h-[75vh] max-w-[75vw]">
-              <VideoPlayer video_url={URL.createObjectURL(blob)} />
+          <div className="mb-5">
+            <p className="text-sm font-semibold text-navy-600">Prévia</p>
+            <h2 className="mt-1 text-2xl font-bold text-navy-900">Sua gravação está pronta</h2>
+          </div>
+          {previewUrl ? (
+            <div className="aspect-video w-full border border-line bg-navy-900">
+              <VideoPlayer video_url={previewUrl} />
               <video
-                src={URL.createObjectURL(blob)}
+                src={previewUrl}
                 ref={videoRef}
-                className="absolute hidden"
+                className="absolute h-px w-px opacity-0"
+                preload="auto"
+                muted
+                playsInline
               />
             </div>
           ) : null}
-          <div className="flex items-center justify-center">
-            <button
+          <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:items-center">
+            <Button
               type="button"
-              className="inline-flex items-center rounded-md bg-indigo-500 px-4 py-2 text-sm font-semibold leading-6 text-white shadow transition duration-150 ease-in-out hover:bg-indigo-400 disabled:cursor-not-allowed"
               disabled={submitting}
               onClick={() => void handleUpload()}
             >
-              {submitting ? (
-                <>
-                  <svg
-                    className="-ml-1 mr-3 h-5 w-5 animate-spin text-white"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    ></circle>
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    ></path>
-                  </svg>
-                  Uploading...
-                </>
-              ) : (
-                <>Save to cloud</>
-              )}
-            </button>
-            <button
+              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <CloudUpload className="h-4 w-4" />}
+              {submitting ? "Salvando..." : "Salvar na biblioteca"}
+            </Button>
+            <Button
               type="button"
-              className="ml-2 inline-flex items-center rounded-md px-4 py-2 text-sm font-semibold leading-6 underline transition duration-150 ease-in-out disabled:cursor-not-allowed"
+              variant="outline"
+              disabled={submitting}
               onClick={() => void handleSave()}
             >
-              Download to device
-            </button>
-            <button
+              <Download className="h-4 w-4" /> Baixar no dispositivo
+            </Button>
+            <Button
               type="button"
-              className="ml-auto inline-flex items-center rounded-md bg-[#dc2625] px-4 py-2 text-sm font-semibold leading-6 text-white shadow transition duration-150 ease-in-out hover:opacity-80 disabled:cursor-not-allowed"
-              onClick={() => void closeModal()}
+              variant="destructive"
+              className="sm:ml-auto"
+              disabled={submitting}
+              onClick={handleDelete}
             >
-              Delete
-            </button>
+              <Trash2 className="h-4 w-4" /> Descartar
+            </Button>
           </div>
         </div>
       ) : null}
     </div>
   );
+}
+
+function getRecordingFileName() {
+  const date = new Intl.DateTimeFormat("pt-BR").format(new Date()).replaceAll("/", "-");
+  return `Demonstração Agilize - ${date}.webm`;
 }

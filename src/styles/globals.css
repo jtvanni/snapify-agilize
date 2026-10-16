@@ -1,12 +1,76 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
 @layer base {
   :root {
-    --radius: 0.5rem
+    --navy-50: 233 50% 97%;
+    --navy-100: 236 48% 94%;
+    --navy-200: 236 45% 86%;
+    --navy-400: 237 39% 59%;
+    --navy-600: 239 41% 39%;
+    --navy-700: 239 50% 30%;
+    --navy-800: 239 63% 22%;
+    --navy-900: 240 83% 16%;
+    --signal: 74 90% 58%;
+    --line: 228 15% 87%;
+    --background: 0 0% 100%;
+    --foreground: 237 37% 12%;
+    --muted: var(--navy-50);
+    --muted-foreground: 232 11% 40%;
+    --destructive: 0 72% 51%;
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+    --radius: 0;
+  }
+
+  * {
+    @apply border-line;
+  }
+
+  html {
+    @apply bg-background;
+  }
+
+  body {
+    @apply m-0 bg-background font-sans text-foreground antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  .font-display {
+    font-family: "Bricolage Grotesque Variable", "Inter Variable", sans-serif;
+  }
+
+  ::selection {
+    background: hsl(var(--signal));
+    color: hsl(var(--navy-900));
+  }
+
+  button,
+  [role="button"],
+  a {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  :focus-visible {
+    outline: 2px solid hsl(var(--navy-600));
+    outline-offset: 2px;
   }
 }
 
 .controlsShadow {
   box-shadow: inset 0 calc(-9 * clamp(8px, 14px, 11px)) calc(3 * clamp(8px, 14px, 11px)) calc(-6 * clamp(8px, 14px, 11px)) hsl(0 0% 0% / 0.35), inset 0 calc(-18 * clamp(8px, 14px, 11px)) calc(6 * clamp(8px, 14px, 11px)) calc(-12 * clamp(8px, 14px, 11px)) hsl(0 0% 0% / 0.35), inset 0 calc(-27 * clamp(8px, 14px, 11px)) calc(9 * clamp(8px, 14px, 11px)) calc(-18 * clamp(8px, 14px, 11px)) hsl(0 0% 0% / 0.35)
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 120ms !important;
+  }
 }

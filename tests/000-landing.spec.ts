@@ -1,12 +1,15 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
-// test.describe("landing", () => {
-//   test("should show logged in state on landing page", async ({ page }) => {
-//     await page.goto("http://localhost:3000/");
-//     await expect(
-//       page.locator(
-//         "div.flex.flex-col.items-center.gap-2 > div > p > span:nth-child(1)"
-//       )
-//     ).toContainText("Logged in as E2E Account");
-//   });
-// });
+test("a tela de entrada usa a marca e o idioma da Agilize", async ({ browser }) => {
+  const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+  const page = await context.newPage();
+
+  await page.goto("http://localhost:3000/sign-in");
+
+  await expect(page).toHaveTitle(/Entrar \| Demonstrações — Agilize IA/);
+  await expect(page.getByRole("heading", { name: "Entre para acessar as demonstrações" })).toBeVisible();
+  await expect(page.getByRole("img", { name: "Logo da Agilize IA" })).toBeVisible();
+  await expect(page.getByText(/Snapify/i)).toHaveCount(0);
+
+  await context.close();
+});

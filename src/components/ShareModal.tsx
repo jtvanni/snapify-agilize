@@ -1,8 +1,11 @@
 import { Dialog, Transition } from "@headlessui/react";
+import { Check, Copy, Share2, X } from "lucide-react";
 import { Fragment, useState } from "react";
-import { ModernSwitch } from "~/components/ModernSwitch";
-import { api, type RouterOutputs } from "~/utils/api";
+
 import ExpireDateSelectMenu from "~/components/ExpireDateSelectMenu";
+import { ModernSwitch } from "~/components/ModernSwitch";
+import { Button } from "~/components/ui/Button";
+import { api, type RouterOutputs } from "~/utils/api";
 
 interface Props {
   video: Extract<RouterOutputs["video"]["get"], { isOwner: true }>;
@@ -10,15 +13,8 @@ interface Props {
 
 export function ShareModal({ video }: Props) {
   const utils = api.useContext();
-  const [open, setOpen] = useState<boolean>(false);
-
-  const openModal = () => {
-    setOpen(true);
-  };
-
-  const closeModal = () => {
-    setOpen(false);
-  };
+  const [open, setOpen] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   const setSharingMutation = api.video.setSharing.useMutation({
     onMutate: async ({ videoId, sharing }) => {
@@ -29,131 +25,137 @@ export function ShareModal({ video }: Props) {
       }
       return { previousValue };
     },
-    onError: (err, { videoId }, context) => {
-      if (context?.previousValue) {
-        utils.video.get.setData({ videoId }, context.previousValue);
-      }
-      console.error(err.message);
+    onError: (error, { videoId }, context) => {
+      if (context?.previousValue) utils.video.get.setData({ videoId }, context.previousValue);
+      console.error(error.message);
     },
   });
 
-  const setDeleteAfterLinkExpiresMutation =
-    api.video.setDeleteAfterLinkExpires.useMutation({
-      onMutate: async ({ videoId, delete_after_link_expires }) => {
-        await utils.video.get.cancel();
-        const previousValue = utils.video.get.getData({ videoId });
-        if (previousValue?.isOwner) {
-          utils.video.get.setData(
-            { videoId },
-            { ...previousValue, delete_after_link_expires }
-          );
-        }
-        return { previousValue };
-      },
-      onError: (err, { videoId }, context) => {
-        if (context?.previousValue) {
-          utils.video.get.setData({ videoId }, context.previousValue);
-        }
-        console.error(err.message);
-      },
-    });
+  const deleteAfterExpirationMutation = api.video.setDeleteAfterLinkExpires.useMutation({
+    onMutate: async ({ videoId, delete_after_link_expires }) => {
+      await utils.video.get.cancel();
+      const previousValue = utils.video.get.getData({ videoId });
+      if (previousValue?.isOwner) {
+        utils.video.get.setData(
+          { videoId },
+          { ...previousValue, delete_after_link_expires }
+        );
+      }
+      return { previousValue };
+    },
+    onError: (error, { videoId }, context) => {
+      if (context?.previousValue) utils.video.get.setData({ videoId }, context.previousValue);
+      console.error(error.message);
+    },
+  });
 
-  const [linkCopied, setLinkCopied] = useState<boolean>(false);
-
-  const handleCopy = () => {
-    void navigator.clipboard.writeText(window.location.href);
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(window.location.href);
     setLinkCopied(true);
-    setTimeout(() => {
-      setLinkCopied(false);
-    }, 5000);
+    window.setTimeout(() => setLinkCopied(false), 2500);
   };
 
   return (
     <>
-      <span
-        onClick={openModal}
-        className="mr-4 max-h-[35px] cursor-pointer rounded border border-[#0000001a] px-2 py-2 text-sm text-[#292d34] hover:bg-[#fafbfc]"
-      >
-        Share
-      </span>
+      <Button type="button" variant="primary" size="sm" onClick={() => setOpen(true)}>
+        <Share2 className="h-4 w-4" aria-hidden="true" />
+        <span className="hidden sm:inline">Compartilhar</span>
+      </Button>
 
       <Transition appear show={open} as={Fragment}>
-        <Dialog as="div" className="relative z-10" onClose={closeModal}>
+        <Dialog as="div" className="relative z-50" onClose={setOpen}>
           <Transition.Child
             as={Fragment}
-            enter="ease-out duration-300"
+            enter="transition-opacity duration-150 ease-out"
             enterFrom="opacity-0"
             enterTo="opacity-100"
-            leave="ease-in duration-200"
+            leave="transition-opacity duration-100 ease-out"
             leaveFrom="opacity-100"
             leaveTo="opacity-0"
           >
-            <div className="fixed inset-0 bg-black bg-opacity-25" />
+            <div className="fixed inset-0 bg-navy-900/40" />
           </Transition.Child>
 
-          <div className="fixed inset-0 overflow-y-auto">
-            <div className="flex min-h-full items-center justify-center p-4 text-center">
+          <div className="fixed inset-0 overflow-y-auto p-4">
+            <div className="flex min-h-full items-center justify-center">
               <Transition.Child
                 as={Fragment}
-                enter="ease-out duration-300"
-                enterFrom="opacity-0 scale-95"
+                enter="transition duration-200 ease-out"
+                enterFrom="opacity-0 scale-[0.97]"
                 enterTo="opacity-100 scale-100"
-                leave="ease-in duration-200"
+                leave="transition duration-150 ease-out"
                 leaveFrom="opacity-100 scale-100"
-                leaveTo="opacity-0 scale-95"
+                leaveTo="opacity-0 scale-[0.97]"
               >
-                <Dialog.Panel className="w-full max-w-md transform rounded bg-white p-6 text-left align-middle text-[#292D34] shadow-xl transition-all">
-                  <div className="flex flex-col items-start">
-                    <span className="text-lg font-medium">
-                      Share this recording
-                    </span>
-                    <div className="mt-6 flex w-full items-center justify-between">
-                      <span className="text-sm font-medium">
-                        Share link with anyone
-                      </span>
-                      <ModernSwitch
-                        enabled={video.sharing}
-                        toggle={() =>
-                          setSharingMutation.mutate({
-                            videoId: video.id,
-                            sharing: !video.sharing,
-                          })
-                        }
-                      />
+                <Dialog.Panel className="w-full max-w-lg border border-line bg-white p-5 shadow-xl sm:p-6">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-semibold text-navy-600">Acesso externo</p>
+                      <Dialog.Title className="mt-1 text-2xl font-bold text-navy-900">
+                        Compartilhar demonstração
+                      </Dialog.Title>
                     </div>
-                    {video.sharing ? (
-                      <>
-                        <button
-                          onClick={handleCopy}
-                          className="my-2 h-8 w-full rounded-md bg-[#4169e1] text-sm font-medium text-white hover:bg-[#224fd7]"
-                        >
-                          {linkCopied ? "Copied!" : "Copy public link"}
-                        </button>
-                        <div className="w-full border border-solid border-[#e9ebf0] bg-[#fafbfc] px-[15px] py-3 text-xs">
-                          <div className="flex h-6 items-center justify-between">
-                            <span>Expire link</span>
-                            <ExpireDateSelectMenu
-                              videoId={video.id}
-                              shareLinkExpiresAt={video.shareLinkExpiresAt}
-                            />
-                          </div>
-                          <div className="mt-3 flex h-6 items-center justify-between">
-                            <span>Delete video after link expires</span>
-                            <ModernSwitch
-                              enabled={video.delete_after_link_expires}
-                              toggle={() =>
-                                setDeleteAfterLinkExpiresMutation.mutate({
-                                  videoId: video.id,
-                                  delete_after_link_expires:
-                                    !video.delete_after_link_expires,
-                                })
-                              }
-                            />
-                          </div>
-                        </div>
-                      </>
-                    ) : null}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setOpen(false)}
+                      aria-label="Fechar"
+                    >
+                      <X className="h-5 w-5" />
+                    </Button>
                   </div>
+
+                  <div className="mt-6 flex items-center justify-between gap-4 border border-line bg-navy-50 p-4">
+                    <div>
+                      <p className="text-sm font-semibold text-navy-900">Link público</p>
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                        Permite que qualquer pessoa com o link assista.
+                      </p>
+                    </div>
+                    <ModernSwitch
+                      enabled={video.sharing}
+                      label="Ativar link público"
+                      toggle={() =>
+                        setSharingMutation.mutate({
+                          videoId: video.id,
+                          sharing: !video.sharing,
+                        })
+                      }
+                    />
+                  </div>
+
+                  {video.sharing ? (
+                    <div className="mt-4 border border-line p-4">
+                      <Button type="button" className="w-full" onClick={() => void handleCopy()}>
+                        {linkCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                        {linkCopied ? "Link copiado" : "Copiar link público"}
+                      </Button>
+
+                      <div className="mt-4 flex items-center justify-between gap-4 border-t border-line pt-4">
+                        <span className="text-sm font-medium text-navy-900">Expiração do link</span>
+                        <ExpireDateSelectMenu
+                          videoId={video.id}
+                          shareLinkExpiresAt={video.shareLinkExpiresAt}
+                        />
+                      </div>
+                      <div className="mt-4 flex items-center justify-between gap-4 border-t border-line pt-4">
+                        <span className="text-sm font-medium text-navy-900">
+                          Excluir vídeo quando o link expirar
+                        </span>
+                        <ModernSwitch
+                          enabled={video.delete_after_link_expires}
+                          label="Excluir vídeo após expiração"
+                          toggle={() =>
+                            deleteAfterExpirationMutation.mutate({
+                              videoId: video.id,
+                              delete_after_link_expires: !video.delete_after_link_expires,
+                            })
+                          }
+                        />
+                      </div>
+                    </div>
+                  ) : null}
                 </Dialog.Panel>
               </Transition.Child>
             </div>

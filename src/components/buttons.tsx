@@ -25,10 +25,10 @@ export interface MediaButtonProps {
 }
 
 export const buttonClass =
-  "group ring-media-focus relative inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-md outline-none ring-inset hover:bg-white/20 focus-visible:ring-4 aria-disabled:hidden";
+  "group ring-media-focus relative inline-flex h-10 w-10 cursor-pointer items-center justify-center outline-none ring-inset transition-[background-color,transform] duration-150 ease-out active:scale-[0.97] hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-signal aria-disabled:hidden";
 
 export const tooltipClass =
-  "animate-out fade-out slide-out-to-bottom-2 data-[state=delayed-open]:animate-in data-[state=delayed-open]:fade-in data-[state=delayed-open]:slide-in-from-bottom-4 z-10 rounded-sm bg-black/90 px-2 py-0.5 text-sm font-medium text-white parent-data-[open]:hidden";
+  "z-10 bg-navy-900 px-2 py-1 text-xs font-medium text-white parent-data-[open]:hidden";
 
 export function Play({
   tooltipOffset = 0,
@@ -39,7 +39,7 @@ export function Play({
   return (
     <Tooltip.Root>
       <Tooltip.Trigger asChild>
-        <PlayButton className={buttonClass}>
+        <PlayButton className={buttonClass} aria-label={isPaused ? "Reproduzir" : "Pausar"}>
           {isPaused ? (
             <PlayIcon className="h-7 w-7 translate-x-px" />
           ) : (
@@ -53,7 +53,7 @@ export function Play({
         align={tooltipAlign}
         sideOffset={tooltipOffset}
       >
-        {isPaused ? "Play" : "Pause"}
+        {isPaused ? "Reproduzir" : "Pausar"}
       </Tooltip.Content>
     </Tooltip.Root>
   );
@@ -69,7 +69,7 @@ export function Mute({
   return (
     <Tooltip.Root>
       <Tooltip.Trigger asChild>
-        <MuteButton className={buttonClass}>
+        <MuteButton className={buttonClass} aria-label={isMuted ? "Ativar som" : "Silenciar"}>
           {isMuted || volume == 0 ? (
             <MuteIcon className="h-7 w-7" />
           ) : volume < 0.5 ? (
@@ -85,7 +85,7 @@ export function Mute({
         align={tooltipAlign}
         sideOffset={tooltipOffset}
       >
-        {isMuted ? "Unmute" : "Mute"}
+        {isMuted ? "Ativar som" : "Silenciar"}
       </Tooltip.Content>
     </Tooltip.Root>
   );
@@ -100,7 +100,10 @@ export function PIP({
   return (
     <Tooltip.Root>
       <Tooltip.Trigger asChild>
-        <PIPButton className={buttonClass}>
+        <PIPButton
+          className={buttonClass}
+          aria-label={isActive ? "Sair da janela flutuante" : "Abrir janela flutuante"}
+        >
           {isActive ? (
             <PictureInPictureExitIcon className="h-7 w-7" />
           ) : (
@@ -114,7 +117,7 @@ export function PIP({
         align={tooltipAlign}
         sideOffset={tooltipOffset}
       >
-        {isActive ? "Exit PIP" : "Enter PIP"}
+        {isActive ? "Sair da janela flutuante" : "Abrir janela flutuante"}
       </Tooltip.Content>
     </Tooltip.Root>
   );
@@ -129,7 +132,10 @@ export function Fullscreen({
   return (
     <Tooltip.Root>
       <Tooltip.Trigger asChild>
-        <FullscreenButton className={buttonClass}>
+        <FullscreenButton
+          className={buttonClass}
+          aria-label={isActive ? "Sair da tela cheia" : "Entrar em tela cheia"}
+        >
           {isActive ? (
             <FullscreenExitIcon className="h-7 w-7" />
           ) : (
@@ -143,7 +149,7 @@ export function Fullscreen({
         align={tooltipAlign}
         sideOffset={tooltipOffset}
       >
-        {isActive ? "Exit Fullscreen" : "Enter Fullscreen"}
+        {isActive ? "Sair da tela cheia" : "Entrar em tela cheia"}
       </Tooltip.Content>
     </Tooltip.Root>
   );

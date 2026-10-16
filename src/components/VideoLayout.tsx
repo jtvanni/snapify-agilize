@@ -19,7 +19,7 @@ export function VideoLayout({ thumbnails }: VideoLayoutProps) {
       <Controls.Root
         hideDelay={500}
         hideOnMouseLeave={true}
-        className="absolute inset-0 z-10 flex h-full w-full flex-col bg-gradient-to-t from-black/10 to-transparent opacity-0 transition-opacity duration-300 media-controls:opacity-100 media-paused:opacity-100"
+        className="absolute inset-0 z-10 flex h-full w-full flex-col bg-gradient-to-t from-black/10 to-transparent opacity-0 transition-opacity duration-200 ease-out media-controls:opacity-100 media-paused:opacity-100"
       >
         <Tooltip.Provider>
           <div className="flex-1" />

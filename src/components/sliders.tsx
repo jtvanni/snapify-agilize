@@ -80,7 +80,7 @@ export function Time({ thumbnails }: TimeSliderProps) {
       </Slider.Track>
 
       <Slider.Thumb
-        aria-label="Current Time"
+        aria-label="Posição do vídeo"
         className="block h-[15px] w-[15px] rounded-full border border-[#cacaca] bg-white opacity-0 outline-none ring-white/40 transition-opacity will-change-[left] focus:opacity-100 focus:ring-4 group-hocus:opacity-100"
       />
 

@@ -5,7 +5,8 @@ export default defineConfig({
   testDir: "tests",
 
   // Run all tests in parallel.
-  fullyParallel: true,
+  // Os fluxos usam a mesma biblioteca semeada e, por isso, rodam em sequência.
+  fullyParallel: false,
 
   // Fail the build on CI if you accidentally left test.only in the source code.
   forbidOnly: !!process.env.CI,
@@ -14,7 +15,7 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
 
   // Opt out of parallel tests on CI.
-  workers: process.env.CI ? 1 : undefined,
+  workers: 1,
 
   // Reporter to use
   reporter: "html",
@@ -31,6 +32,7 @@ export default defineConfig({
     { name: "setup", testMatch: /.*\.setup\.ts/ },
     {
       name: "chromium",
+      dependencies: ["setup"],
       use: {
         ...devices["Desktop Chrome"],
         storageState: "tests/.auth/user.json",

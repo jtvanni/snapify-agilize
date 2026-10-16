@@ -1,63 +1,75 @@
-import React, { type ChangeEvent, Fragment, useRef, useState } from "react";
 import { Dialog, Transition } from "@headlessui/react";
-import { api } from "~/utils/api";
 import axios from "axios";
-import { useRouter } from "next/router";
 import { useAtom } from "jotai";
+import { FileVideo, Loader2, Upload, X } from "lucide-react";
+import { useRouter } from "next/router";
+import { type ChangeEvent, Fragment, useEffect, useRef, useState } from "react";
+
 import uploadVideoModalOpen from "~/atoms/uploadVideoModalOpen";
+import { Button } from "~/components/ui/Button";
 import generateThumbnail from "~/utils/generateThumbnail";
+import { api } from "~/utils/api";
 
 export default function VideoUploadModal() {
   const [open, setOpen] = useAtom(uploadVideoModalOpen);
   const router = useRouter();
-  const [submitting, setSubmitting] = useState<boolean>(false);
+  const [submitting, setSubmitting] = useState(false);
   const [file, setFile] = useState<File>();
+  const [previewUrl, setPreviewUrl] = useState<string>();
   const getSignedUrl = api.video.getUploadUrl.useMutation();
   const abortUpload = api.video.abortUpload.useMutation();
   const apiUtils = api.useContext();
-  const videoRef = useRef<null | HTMLVideoElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
-  const handleFileChange = (e: ChangeEvent<HTMLInputElement>): void => {
-    if (e.target.files) {
-      setFile(e.target.files[0]);
+  useEffect(() => {
+    if (!file) {
+      setPreviewUrl(undefined);
+      return;
     }
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+
+  const closeModal = () => {
+    if (submitting) return;
+    setOpen(false);
+    setFile(undefined);
   };
 
-  function closeModal() {
-    setOpen(false);
-  }
+  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    setFile(event.target.files?.[0]);
+  };
 
-  const handleSubmit = async (): Promise<void> => {
+  const handleSubmit = async () => {
     if (!file) return;
     if (file.type !== "video/webm" && file.type !== "video/mp4") {
       alert("Envie um arquivo WebM ou MP4.");
       return;
     }
+
     setSubmitting(true);
     let videoId: string | undefined;
     try {
-      const { signedVideoUrl, signedThumbnailUrl, id } =
-        await getSignedUrl.mutateAsync({
-          key: file.name,
-          contentType: file.type,
-        });
+      const { signedVideoUrl, signedThumbnailUrl, id } = await getSignedUrl.mutateAsync({
+        key: file.name,
+        contentType: file.type,
+      });
       videoId = id;
       await axios.put(signedVideoUrl, file.slice(), {
         headers: { "Content-Type": file.type },
       });
-      if (!videoRef.current) throw new Error("Video preview unavailable");
-      await axios.put(
-        signedThumbnailUrl,
-        await generateThumbnail(videoRef.current),
-        { headers: { "Content-Type": "image/png" } }
-      );
+      if (!videoRef.current) throw new Error("Prévia do vídeo indisponível");
+      await axios.put(signedThumbnailUrl, await generateThumbnail(videoRef.current), {
+        headers: { "Content-Type": "image/png" },
+      });
       setOpen(false);
-      await router.push("/share/" + id);
+      setFile(undefined);
+      await router.push(`/share/${id}`);
     } catch (error) {
-      if (videoId) {
-        await abortUpload.mutateAsync({ videoId }).catch(console.error);
-      }
+      if (videoId) await abortUpload.mutateAsync({ videoId }).catch(console.error);
       console.error(error);
+      alert("Não foi possível enviar o vídeo. Tente novamente.");
     } finally {
       setSubmitting(false);
       void apiUtils.video.getAll.invalidate();
@@ -66,101 +78,96 @@ export default function VideoUploadModal() {
 
   return (
     <Transition appear show={open} as={Fragment}>
-      <Dialog
-        as="div"
-        className="relative z-10"
-        onClose={() => void closeModal()}
-      >
-        <div className="fixed inset-0 overflow-y-auto">
-          <div className="flex min-h-full items-center justify-center p-4 text-center">
+      <Dialog as="div" className="relative z-50" onClose={closeModal}>
+        <Transition.Child
+          as={Fragment}
+          enter="transition-opacity duration-150 ease-out"
+          enterFrom="opacity-0"
+          enterTo="opacity-100"
+          leave="transition-opacity duration-100 ease-out"
+          leaveFrom="opacity-100"
+          leaveTo="opacity-0"
+        >
+          <div className="fixed inset-0 bg-navy-900/40" />
+        </Transition.Child>
+        <div className="fixed inset-0 overflow-y-auto p-4">
+          <div className="flex min-h-full items-center justify-center">
             <Transition.Child
               as={Fragment}
-              enter="ease-out duration-300"
-              enterFrom="opacity-0 scale-95"
+              enter="transition duration-200 ease-out"
+              enterFrom="opacity-0 scale-[0.97]"
               enterTo="opacity-100 scale-100"
-              leave="ease-in duration-200"
+              leave="transition duration-150 ease-out"
               leaveFrom="opacity-100 scale-100"
-              leaveTo="opacity-0 scale-95"
+              leaveTo="opacity-0 scale-[0.97]"
             >
-              <Dialog.Panel className="w-fit transform rounded-lg bg-white p-6 text-left align-middle shadow-xl transition-all">
-                <div className="flex flex-col items-center gap-2">
-                  <label className="flex h-32 w-full min-w-[300px] cursor-pointer appearance-none justify-center rounded-md border-2 border-dashed border-gray-300 px-4 transition hover:border-gray-400 focus:outline-none">
-                    <span className="mx-6 flex items-center space-x-2 text-[#292D34]">
-                      {file ? (
-                        <video
-                          src={URL.createObjectURL(file)}
-                          controls
-                          ref={videoRef}
-                          className="max-h-[0px] max-w-[15px]"
-                          controlsList="nodownload"
-                        />
-                      ) : null}
-                      {file ? (
-                        <span className="font-medium">{file.name}</span>
-                      ) : (
-                        <>
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-6 w-6"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                            />
-                          </svg>
-                          <span className="font-medium">
-                            {"Drop files to Attach, or browse"}
-                          </span>
-                        </>
-                      )}
-                    </span>
-                    <input
-                      accept="video/mp4,video/webm"
-                      onChange={handleFileChange}
-                      type="file"
-                      name="file_upload"
-                      className="hidden"
-                    />
-                  </label>
-                  <button
+              <Dialog.Panel className="w-full max-w-xl border border-line bg-white p-5 shadow-xl sm:p-6">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-semibold text-navy-600">Adicionar ao acervo</p>
+                    <Dialog.Title className="mt-1 text-2xl font-bold text-navy-900">
+                      Enviar vídeo
+                    </Dialog.Title>
+                  </div>
+                  <Button
                     type="button"
-                    className="mt-4 inline-flex items-center rounded-md bg-indigo-500 px-4 py-2 text-sm font-semibold leading-6 text-white shadow transition duration-150 ease-in-out hover:bg-indigo-400 disabled:cursor-not-allowed"
+                    variant="ghost"
+                    size="icon"
+                    onClick={closeModal}
                     disabled={submitting}
-                    onClick={() => void handleSubmit()}
+                    aria-label="Fechar"
                   >
-                    {submitting ? (
-                      <>
-                        <svg
-                          className="-ml-1 mr-3 h-5 w-5 animate-spin text-white"
-                          xmlns="http://www.w3.org/2000/svg"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                        >
-                          <circle
-                            className="opacity-25"
-                            cx="12"
-                            cy="12"
-                            r="10"
-                            stroke="currentColor"
-                            strokeWidth="4"
-                          ></circle>
-                          <path
-                            className="opacity-75"
-                            fill="currentColor"
-                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                          ></path>
-                        </svg>
-                        Uploading...
-                      </>
-                    ) : (
-                      <>Upload</>
-                    )}
-                  </button>
+                    <X className="h-5 w-5" />
+                  </Button>
+                </div>
+
+                <label className="mt-6 flex min-h-44 cursor-pointer flex-col items-center justify-center border border-dashed border-navy-400 bg-navy-50 px-6 py-8 text-center transition-colors duration-150 ease-out hover:border-navy-600 hover:bg-navy-100 focus-within:ring-2 focus-within:ring-navy-600 focus-within:ring-offset-2">
+                  {file ? (
+                    <>
+                      <FileVideo className="h-8 w-8 text-navy-600" aria-hidden="true" />
+                      <span className="mt-3 max-w-full truncate text-sm font-semibold text-navy-900">
+                        {file.name}
+                      </span>
+                      <span className="mt-1 text-xs text-muted-foreground">Clique para escolher outro arquivo</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-8 w-8 text-navy-600" aria-hidden="true" />
+                      <span className="mt-3 text-sm font-semibold text-navy-900">
+                        Selecione ou arraste um vídeo
+                      </span>
+                      <span className="mt-1 text-xs text-muted-foreground">Arquivos MP4 ou WebM</span>
+                    </>
+                  )}
+                  <input
+                    accept="video/mp4,video/webm"
+                    onChange={handleFileChange}
+                    type="file"
+                    name="file_upload"
+                    className="sr-only"
+                    disabled={submitting}
+                  />
+                </label>
+
+                {previewUrl ? (
+                  <video
+                    src={previewUrl}
+                    ref={videoRef}
+                    className="absolute h-px w-px opacity-0"
+                    preload="auto"
+                    muted
+                    playsInline
+                  />
+                ) : null}
+
+                <div className="mt-6 flex justify-end gap-2">
+                  <Button type="button" variant="outline" onClick={closeModal} disabled={submitting}>
+                    Cancelar
+                  </Button>
+                  <Button type="button" onClick={() => void handleSubmit()} disabled={!file || submitting}>
+                    {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                    {submitting ? "Enviando..." : "Enviar vídeo"}
+                  </Button>
                 </div>
               </Dialog.Panel>
             </Transition.Child>

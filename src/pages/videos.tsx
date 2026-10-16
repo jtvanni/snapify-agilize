@@ -4,16 +4,19 @@ import Image from "next/image";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { useAtom } from "jotai";
+import { MonitorUp, Video } from "lucide-react";
 
-import { api } from "~/utils/api";
-import { getTime } from "~/utils/getTime";
-import ProfileMenu from "~/components/ProfileMenu";
+import AppHeader from "~/components/AppHeader";
 import NewVideoMenu from "~/components/NewVideoMenu";
+import ProfileMenu from "~/components/ProfileMenu";
+import { Button } from "~/components/ui/Button";
 import VideoRecordModal from "~/components/VideoRecordModal";
 import VideoUploadModal from "~/components/VideoUploadModal";
-import uploadVideoModalOpen from "~/atoms/uploadVideoModalOpen";
 import recordVideoModalOpen from "~/atoms/recordVideoModalOpen";
+import uploadVideoModalOpen from "~/atoms/uploadVideoModalOpen";
 import { getServerAuthSession } from "~/server/auth";
+import { api } from "~/utils/api";
+import { getTime } from "~/utils/getTime";
 
 const VideoList: NextPage = () => {
   const [, setRecordOpen] = useAtom(recordVideoModalOpen);
@@ -25,7 +28,7 @@ const VideoList: NextPage = () => {
 
   const openRecordModal = () => {
     if (!navigator?.mediaDevices?.getDisplayMedia) {
-      return alert("Your browser does not support screen recording.");
+      return alert("Seu navegador não oferece suporte à gravação de tela.");
     }
     setRecordOpen(true);
   };
@@ -33,58 +36,66 @@ const VideoList: NextPage = () => {
   return (
     <>
       <Head>
-        <title>Biblioteca | Agilize IA</title>
-        <meta name="description" content="Gravações internas da Agilize IA" />
+        <title>Biblioteca | Demonstrações — Agilize IA</title>
+        <meta name="description" content="Demonstrações internas da Agilize IA" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
-      <main className="flex h-screen min-h-screen flex-col items-center bg-[#fbfbfb]">
-        <header className="flex min-h-[62px] w-full items-center justify-between border-b border-[#E7E9EB] bg-white px-6">
-          <Link href="/videos" className="font-semibold">
-            Agilize IA
-          </Link>
-          <div className="flex items-center">
-            <VideoRecordModal />
-            <VideoUploadModal />
-            <NewVideoMenu />
-            {status === "authenticated" && (
-              <div className="ml-4">
-                <ProfileMenu />
-              </div>
-            )}
-          </div>
-        </header>
+      <main className="min-h-screen bg-navy-50">
+        <AppHeader
+          actions={
+            <>
+              <VideoRecordModal />
+              <VideoUploadModal />
+              <NewVideoMenu />
+              {status === "authenticated" ? <ProfileMenu /> : null}
+            </>
+          }
+        />
 
-        <section className="flex w-full grow items-start justify-center overflow-auto pt-14">
+        <section className="mx-auto w-full max-w-[1184px] px-4 py-8 sm:px-8 sm:py-10">
+          <div className="mb-6 flex items-end justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold text-navy-600">Acervo interno</p>
+              <h1 className="mt-1 text-3xl font-bold tracking-[-0.03em] text-navy-900">
+                Biblioteca de demonstrações
+              </h1>
+            </div>
+            {!isLoading && videos?.length ? (
+              <span className="hidden text-sm text-muted-foreground sm:block">
+                {videos.length} {videos.length === 1 ? "demonstração" : "demonstrações"}
+              </span>
+            ) : null}
+          </div>
+
           {!isLoading && videos?.length === 0 ? (
-            <div className="flex flex-col px-8">
-              <span className="text-lg font-semibold text-zinc-700">
-                Nenhum vídeo encontrado
-              </span>
-              <span className="mt-1 text-base text-zinc-500">
-                Grave a tela ou envie um vídeo para começar.
-              </span>
-              <div className="mt-4 flex gap-4">
-                <button
-                  onClick={openRecordModal}
-                  className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
-                >
-                  Gravar vídeo
-                </button>
-                <button
-                  onClick={() => setUploadOpen(true)}
-                  className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-                >
-                  Enviar vídeo
-                </button>
+            <div className="grid min-h-[320px] place-items-center border border-line bg-white p-6 text-center">
+              <div className="max-w-md">
+                <div className="mx-auto grid h-12 w-12 place-items-center bg-navy-100 text-navy-900">
+                  <Video aria-hidden="true" className="h-6 w-6" />
+                </div>
+                <h2 className="mt-5 text-xl font-bold text-navy-900">
+                  Nenhuma demonstração por aqui
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                  Grave sua tela ou envie um vídeo para começar a montar a biblioteca.
+                </p>
+                <div className="mt-6 flex flex-col justify-center gap-2 sm:flex-row">
+                  <Button onClick={openRecordModal}>
+                    <Video className="h-4 w-4" aria-hidden="true" />
+                    Gravar tela
+                  </Button>
+                  <Button variant="outline" onClick={() => setUploadOpen(true)}>
+                    <MonitorUp className="h-4 w-4" aria-hidden="true" />
+                    Enviar vídeo
+                  </Button>
+                </div>
               </div>
             </div>
           ) : (
-            <div className="grid w-full max-w-[1300px] grid-cols-[repeat(auto-fill,250px)] justify-center gap-14 px-4 pb-16">
-              {videos?.map((video) => (
-                <VideoCard key={video.id} {...video} />
-              ))}
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-px border border-line bg-line">
+              {videos?.map((video) => <VideoCard key={video.id} {...video} />)}
               {isLoading &&
-                Array.from({ length: 4 }, (_, index) => (
+                Array.from({ length: 8 }, (_, index) => (
                   <VideoCardSkeleton key={index} />
                 ))}
             </div>
@@ -100,10 +111,7 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
 
   if (!session) {
     return {
-      redirect: {
-        destination: "/sign-in",
-        permanent: false,
-      },
+      redirect: { destination: "/sign-in", permanent: false },
     };
   }
 
@@ -118,30 +126,38 @@ interface VideoCardProps {
 }
 
 const VideoCard = ({ title, id, thumbnailUrl, createdAt }: VideoCardProps) => (
-  <Link href={`/share/${id}`}>
-    <article className="h-[240px] w-[250px] cursor-pointer overflow-hidden rounded-lg border border-[#6c668533] bg-white text-sm">
-      <Image
-        src={thumbnailUrl}
-        className="h-[140px] w-[248px] object-cover"
-        alt="Miniatura do vídeo"
-        width={248}
-        height={140}
-        unoptimized
-      />
-      <div className="m-4 flex flex-col">
-        <span className="line-clamp-2 font-bold">{title}</span>
-        <span className="mt-2 text-[#606060]">{getTime(createdAt)}</span>
+  <Link
+    href={`/share/${id}`}
+    className="group min-w-0 bg-white transition-colors duration-150 ease-out hover:bg-navy-50 focus-visible:z-10"
+    aria-label={`Abrir demonstração: ${title}`}
+  >
+    <article>
+      <div className="aspect-video overflow-hidden bg-navy-900">
+        <Image
+          src={thumbnailUrl}
+          className="h-full w-full object-cover transition-transform duration-200 ease-out group-hover:scale-[1.015]"
+          alt="Miniatura da demonstração"
+          width={640}
+          height={360}
+          unoptimized
+        />
+      </div>
+      <div className="min-h-[92px] border-t border-line p-4">
+        <h2 className="line-clamp-2 text-sm font-semibold leading-5 text-foreground">
+          {title}
+        </h2>
+        <p className="mt-2 text-xs text-muted-foreground">{getTime(createdAt)}</p>
       </div>
     </article>
   </Link>
 );
 
 const VideoCardSkeleton = () => (
-  <div className="h-[240px] w-[250px] animate-pulse overflow-hidden rounded-lg border border-[#6c668533]">
-    <div className="h-[140px] bg-slate-200" />
-    <div className="m-4 space-y-4">
-      <div className="h-4 rounded bg-slate-200" />
-      <div className="h-4 rounded bg-slate-200" />
+  <div className="animate-pulse bg-white" aria-hidden="true">
+    <div className="aspect-video bg-navy-100" />
+    <div className="min-h-[92px] border-t border-line p-4">
+      <div className="h-4 w-4/5 bg-navy-100" />
+      <div className="mt-3 h-3 w-1/3 bg-navy-100" />
     </div>
   </div>
 );

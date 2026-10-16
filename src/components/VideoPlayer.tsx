@@ -30,7 +30,9 @@ export default function VideoPlayer({ video_url, thumbnailUrl }: Props) {
 
   return (
     <MediaPlayer
-      className="ring-media-focus aspect-video w-full overflow-hidden rounded-md bg-black font-sans text-white data-[focus]:ring-4"
+      aria-label="Player da demonstração"
+      data-testid="video-player"
+      className="ring-media-focus aspect-video h-full w-full overflow-hidden bg-black font-sans text-white data-[focus]:ring-2 data-[focus]:ring-signal"
       src={[
         {
           src: video_url,
@@ -46,9 +48,9 @@ export default function VideoPlayer({ video_url, thumbnailUrl }: Props) {
       <MediaProvider>
         {thumbnailUrl ? (
           <Poster
-            className="absolute inset-0 block h-full w-full rounded-md object-cover opacity-0 transition-opacity data-[visible]:opacity-100"
+            className="absolute inset-0 block h-full w-full object-cover opacity-0 transition-opacity data-[visible]:opacity-100"
             src={thumbnailUrl}
-            alt="video thumbnail"
+            alt="Miniatura da demonstração"
           />
         ) : null}
       </MediaProvider>
