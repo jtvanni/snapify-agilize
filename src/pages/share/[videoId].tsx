@@ -10,19 +10,13 @@ import { ShareModal } from "~/components/ShareModal";
 import { useSession } from "next-auth/react";
 import VideoMoreMenu from "~/components/VideoMoreMenu";
 import ProfileMenu from "~/components/ProfileMenu";
-import { usePostHog } from "posthog-js/react";
-import { useAtom } from "jotai";
-import recordVideoModalOpen from "~/atoms/recordVideoModalOpen";
-import VideoRecordModal from "~/components/VideoRecordModal";
 import defaultProfileIcon from "~/assets/default profile icon.jpg";
 import VideoPlayer from "~/components/VideoPlayer";
 
 const VideoList: NextPage = () => {
   const router = useRouter();
-  const { status, data: session } = useSession();
+  const { status } = useSession();
   const { videoId } = router.query as { videoId: string };
-  const posthog = usePostHog();
-  const [, setRecordOpen] = useAtom(recordVideoModalOpen);
 
   const { data: video, isLoading } = api.video.get.useQuery(
     { videoId },
@@ -33,30 +27,8 @@ const VideoList: NextPage = () => {
         if (error?.data?.code === "FORBIDDEN") return false;
         else return failureCount < 2;
       },
-      onError: (err) => {
-        if (err?.data?.code === "FORBIDDEN") {
-          posthog?.capture("video page: FORBIDDEN");
-        } else if (err?.data?.code === "NOT_FOUND") {
-          posthog?.capture("video page: NOT_FOUND");
-        }
-      },
     }
   );
-
-  const openRecordModal = () => {
-    if (
-      !navigator?.mediaDevices?.getDisplayMedia &&
-      !navigator?.mediaDevices?.getDisplayMedia
-    ) {
-      return alert("Your browser is currently NOT supported.");
-    }
-    setRecordOpen(true);
-
-    posthog?.capture("open record video modal", {
-      stripeSubscriptionStatus: session?.user.stripeSubscriptionStatus,
-      cta: "shared video",
-    });
-  };
 
   if (!isLoading && !video) {
     return (
@@ -65,17 +37,7 @@ const VideoList: NextPage = () => {
           This recording is currently unavailable
         </span>
         <span className="mt-3 max-w-[80%] text-center text-sm">
-          To create your own public recordings,{" "}
-          <Link
-            onClick={() =>
-              posthog?.capture("click sign-up from video error page")
-            }
-            href="/sign-in"
-            className="pointer text-[#4169e1] underline"
-          >
-            create an account
-          </Link>{" "}
-          for free!
+          O link pode ter expirado ou o compartilhamento foi desativado.
         </span>
       </div>
     );
@@ -103,7 +65,7 @@ const VideoList: NextPage = () => {
             <span>Snapify</span>
           </Link>
           <div className="flex items-center justify-center">
-            {video && video.userId === session?.user.id ? (
+            {video?.isOwner ? (
               <>
                 <VideoMoreMenu video={video} />
                 <ShareModal video={video} />
@@ -121,12 +83,9 @@ const VideoList: NextPage = () => {
                 </div>
               </>
             ) : (
-              <button
-                onClick={openRecordModal}
-                className="inline-flex max-h-[35px] items-center rounded-md border border-transparent bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
-              >
-                Record a video
-              </button>
+              <span className="text-sm font-medium text-gray-600">
+                Agilize IA
+              </span>
             )}
           </div>
         </div>
@@ -183,8 +142,6 @@ const VideoList: NextPage = () => {
           </div>
         </div>
       </main>
-
-      <VideoRecordModal />
     </>
   );
 };

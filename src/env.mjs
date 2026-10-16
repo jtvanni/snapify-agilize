@@ -6,6 +6,7 @@ import { z } from "zod";
  */
 const server = z.object({
   DATABASE_URL: z.string().url(),
+  DIRECT_URL: z.string().url(),
   NODE_ENV: z.enum(["development", "test", "production"]),
   NEXTAUTH_SECRET:
     process.env.NODE_ENV === "production"
@@ -19,20 +20,23 @@ const server = z.object({
     process.env.VERCEL ? z.string().min(1) : z.string().url()
   ),
   // Add `.min(1) on ID and SECRET if you want to make sure they're not empty
-  GOOGLE_CLIENT_ID: z.string().nullish(),
-  GOOGLE_CLIENT_SECRET: z.string().nullish(),
   GITHUB_ID: z.string(),
   GITHUB_SECRET: z.string(),
-  AWS_ENDPOINT: z.string(),
-  AWS_REGION: z.string(),
+  ALLOWED_EMAILS:
+    process.env.NODE_ENV === "production"
+      ? z.string().min(1)
+      : z.string().default(""),
+  AWS_ENDPOINT: z.literal(
+    "https://mmsskyvdparwnrwlwsrj.storage.supabase.co/storage/v1/s3"
+  ),
+  AWS_REGION: z.literal("sa-east-1"),
   AWS_KEY_ID: z.string(),
   AWS_SECRET_ACCESS_KEY: z.string(),
-  AWS_BUCKET_NAME: z.string(),
-  STRIPE_SECRET_KEY: z.string().nullish(),
-  STRIPE_WEBHOOK_SECRET: z.string().nullish(),
-  STRIPE_MONTHLY_PRICE_ID: z.string().nullish(),
-  STRIPE_ANNUAL_PRICE_ID: z.string().nullish(),
-  POSTHOG_PROXY_PATH: z.string().nullish(),
+  AWS_BUCKET_NAME: z.literal("snapify-videos"),
+  CRON_SECRET:
+    process.env.NODE_ENV === "production"
+      ? z.string().min(16)
+      : z.string().min(16).optional(),
   UPSTASH_REDIS_REST_URL: z.string().nullish(),
   UPSTASH_REDIS_REST_TOKEN: z.string().nullish(),
 });
@@ -41,14 +45,7 @@ const server = z.object({
  * Specify your client-side environment variables schema here. This way you can ensure the app isn't
  * built with invalid env vars. To expose them to the client, prefix them with `NEXT_PUBLIC_`.
  */
-const client = z.object({
-  // NEXT_PUBLIC_CLIENTVAR: z.string().min(1),
-  NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: z.string().nullish(),
-  NEXT_PUBLIC_CRISP_WEBSITE_ID: z.string().nullish(),
-  NEXT_PUBLIC_POSTHOG_KEY: z.string().nullish(),
-  NEXT_PUBLIC_POSTHOG_HOST: z.string().nullish(),
-  NEXT_PUBLIC_POSTHOG_PROXY_HOST: z.string().nullish(),
-});
+const client = z.object({});
 
 /**
  * You can't destruct `process.env` as a regular object in the Next.js edge runtimes (e.g.
@@ -58,30 +55,20 @@ const client = z.object({
  */
 const processEnv = {
   DATABASE_URL: process.env.DATABASE_URL,
+  DIRECT_URL: process.env.DIRECT_URL,
   NODE_ENV: process.env.NODE_ENV,
   NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
   NEXTAUTH_URL: process.env.NEXTAUTH_URL,
   // NEXT_PUBLIC_CLIENTVAR: process.env.NEXT_PUBLIC_CLIENTVAR,
-  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
-  GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
   GITHUB_ID: process.env.GITHUB_ID,
   GITHUB_SECRET: process.env.GITHUB_SECRET,
+  ALLOWED_EMAILS: process.env.ALLOWED_EMAILS,
   AWS_ENDPOINT: process.env.AWS_ENDPOINT,
   AWS_REGION: process.env.AWS_REGION,
   AWS_KEY_ID: process.env.AWS_KEY_ID,
   AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY,
   AWS_BUCKET_NAME: process.env.AWS_BUCKET_NAME,
-  NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY:
-    process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,
-  STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
-  STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
-  STRIPE_MONTHLY_PRICE_ID: process.env.STRIPE_MONTHLY_PRICE_ID,
-  STRIPE_ANNUAL_PRICE_ID: process.env.STRIPE_ANNUAL_PRICE_ID,
-  NEXT_PUBLIC_CRISP_WEBSITE_ID: process.env.NEXT_PUBLIC_CRISP_WEBSITE_ID,
-  NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
-  NEXT_PUBLIC_POSTHOG_HOST: process.env.NEXT_PUBLIC_POSTHOG_HOST,
-  POSTHOG_PROXY_PATH: process.env.POSTHOG_PROXY_PATH,
-  NEXT_PUBLIC_POSTHOG_PROXY_HOST: process.env.NEXT_PUBLIC_POSTHOG_PROXY_HOST,
+  CRON_SECRET: process.env.CRON_SECRET,
   UPSTASH_REDIS_REST_URL: process.env.UPSTASH_REDIS_REST_URL,
   UPSTASH_REDIS_REST_TOKEN: process.env.UPSTASH_REDIS_REST_TOKEN,
 };

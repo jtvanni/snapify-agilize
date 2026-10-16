@@ -3,17 +3,10 @@ import { Fragment } from "react";
 import uploadVideoModalOpen from "~/atoms/uploadVideoModalOpen";
 import { useAtom } from "jotai";
 import recordVideoModalOpen from "~/atoms/recordVideoModalOpen";
-import paywallAtom from "~/atoms/paywallAtom";
-import { useSession } from "next-auth/react";
-import { usePostHog } from "posthog-js/react";
-import { env } from "~/env.mjs";
 
 export default function NewVideoMenu() {
   const [, setRecordOpen] = useAtom(recordVideoModalOpen);
   const [, setUploadOpen] = useAtom(uploadVideoModalOpen);
-  const [, setPaywallOpen] = useAtom(paywallAtom);
-  const { data: session } = useSession();
-  const posthog = usePostHog();
 
   const openRecordModal = () => {
     if (
@@ -23,29 +16,10 @@ export default function NewVideoMenu() {
       return alert("Your browser is currently NOT supported.");
     }
     setRecordOpen(true);
-
-    posthog?.capture("open record video modal", {
-      stripeSubscriptionStatus: session?.user.stripeSubscriptionStatus,
-    });
   };
 
   const openUploadModal = () => {
-    if (
-      session?.user.stripeSubscriptionStatus === "active" ||
-      !env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
-    ) {
-      setUploadOpen(true);
-
-      posthog?.capture("open upload video modal", {
-        stripeSubscriptionStatus: session?.user.stripeSubscriptionStatus,
-      });
-    } else {
-      setPaywallOpen(true);
-
-      posthog?.capture("hit video upload paywall", {
-        stripeSubscriptionStatus: session?.user.stripeSubscriptionStatus,
-      });
-    }
+    setUploadOpen(true);
   };
 
   return (

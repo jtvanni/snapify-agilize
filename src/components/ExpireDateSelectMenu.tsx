@@ -22,7 +22,7 @@ export default function ExpireDateSelectMenu({
       onMutate: async ({ videoId, shareLinkExpiresAt }) => {
         await utils.video.get.cancel();
         const previousValue = utils.video.get.getData({ videoId });
-        if (previousValue) {
+        if (previousValue?.isOwner) {
           utils.video.get.setData(
             { videoId },
             { ...previousValue, shareLinkExpiresAt }

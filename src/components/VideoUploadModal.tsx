@@ -5,8 +5,6 @@ import axios from "axios";
 import { useRouter } from "next/router";
 import { useAtom } from "jotai";
 import uploadVideoModalOpen from "~/atoms/uploadVideoModalOpen";
-import { usePostHog } from "posthog-js/react";
-import { useSession } from "next-auth/react";
 import generateThumbnail from "~/utils/generateThumbnail";
 
 export default function VideoUploadModal() {
@@ -15,10 +13,9 @@ export default function VideoUploadModal() {
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [file, setFile] = useState<File>();
   const getSignedUrl = api.video.getUploadUrl.useMutation();
+  const abortUpload = api.video.abortUpload.useMutation();
   const apiUtils = api.useContext();
   const videoRef = useRef<null | HTMLVideoElement>(null);
-  const posthog = usePostHog();
-  const { data: session } = useSession();
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>): void => {
     if (e.target.files) {
@@ -28,42 +25,43 @@ export default function VideoUploadModal() {
 
   function closeModal() {
     setOpen(false);
-
-    posthog?.capture("cancel video upload", {
-      stripeSubscriptionStatus: session?.user.stripeSubscriptionStatus,
-    });
   }
 
   const handleSubmit = async (): Promise<void> => {
     if (!file) return;
+    if (file.type !== "video/webm" && file.type !== "video/mp4") {
+      alert("Envie um arquivo WebM ou MP4.");
+      return;
+    }
     setSubmitting(true);
-    const { signedVideoUrl, signedThumbnailUrl, id } =
-      await getSignedUrl.mutateAsync({
-        key: file.name,
-      });
-    await axios
-      .put(signedVideoUrl, file.slice(), {
+    let videoId: string | undefined;
+    try {
+      const { signedVideoUrl, signedThumbnailUrl, id } =
+        await getSignedUrl.mutateAsync({
+          key: file.name,
+          contentType: file.type,
+        });
+      videoId = id;
+      await axios.put(signedVideoUrl, file.slice(), {
         headers: { "Content-Type": file.type },
-      })
-      .then(async () => {
-        if (!videoRef.current) return;
-        return axios.put(
-          signedThumbnailUrl,
-          await generateThumbnail(videoRef.current),
-          {
-            headers: { "Content-Type": "image/png" },
-          }
-        );
-      })
-      .then(() => {
-        setOpen(false);
-        void router.push("share/" + id);
-      })
-      .catch((err) => {
-        console.error(err);
       });
-    setSubmitting(false);
-    void apiUtils.video.getAll.invalidate();
+      if (!videoRef.current) throw new Error("Video preview unavailable");
+      await axios.put(
+        signedThumbnailUrl,
+        await generateThumbnail(videoRef.current),
+        { headers: { "Content-Type": "image/png" } }
+      );
+      setOpen(false);
+      await router.push("/share/" + id);
+    } catch (error) {
+      if (videoId) {
+        await abortUpload.mutateAsync({ videoId }).catch(console.error);
+      }
+      console.error(error);
+    } finally {
+      setSubmitting(false);
+      void apiUtils.video.getAll.invalidate();
+    }
   };
 
   return (

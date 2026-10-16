@@ -1,33 +1,13 @@
 import { Menu, Transition } from "@headlessui/react";
 import { Fragment } from "react";
 import { signOut, useSession } from "next-auth/react";
-import { useRouter } from "next/router";
-import { api } from "~/utils/api";
-import { usePostHog } from "posthog-js/react";
 import defaultProfileIcon from "~/assets/default profile icon.jpg";
 import Image from "next/image";
 
 export default function ProfileMenu() {
-  const { mutateAsync: createBillingPortalSession } =
-    api.stripe.createBillingPortalSession.useMutation();
-  const { push } = useRouter();
   const { data: session } = useSession();
-  const posthog = usePostHog();
-
-  const openBillingSettings = () => {
-    void createBillingPortalSession().then(({ billingPortalUrl }) => {
-      if (billingPortalUrl) {
-        void push(billingPortalUrl);
-      }
-    });
-
-    posthog?.capture("billing settings opened", {
-      stripeSubscriptionStatus: session?.user.stripeSubscriptionStatus,
-    });
-  };
 
   const handleSignOut = () => {
-    if (posthog?.__loaded) posthog?.reset();
     void signOut();
   };
 
@@ -55,20 +35,6 @@ export default function ProfileMenu() {
       >
         <Menu.Items className="absolute right-0 z-10 mt-2 origin-top-right divide-y divide-gray-100 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
           <div className="px-1 py-1 ">
-            <Menu.Item>
-              {({ active }) => (
-                <div
-                  onClick={openBillingSettings}
-                  className={`mx-2 flex h-8 w-40 cursor-pointer flex-row content-center rounded-md p-2 ${
-                    active ? "bg-gray-100" : ""
-                  }`}
-                >
-                  <p className="leading-2 text-sm leading-4">
-                    Billing settings
-                  </p>
-                </div>
-              )}
-            </Menu.Item>
             <Menu.Item>
               {({ active }) => (
                 <div

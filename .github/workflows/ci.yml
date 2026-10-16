@@ -3,18 +3,19 @@ name: CI
 on: [push, pull_request]
 
 env:
-  DATABASE_URL: "https://fake.com"
-  AWS_ENDPOINT: "https://fake.com"
-  AWS_REGION: "us-east-005"
+  DATABASE_URL: "postgresql://snapify_prisma:placeholder@localhost:5432/postgres?schema=snapify"
+  DIRECT_URL: "postgresql://snapify_prisma:placeholder@localhost:5432/postgres?schema=snapify"
+  AWS_ENDPOINT: "https://mmsskyvdparwnrwlwsrj.storage.supabase.co/storage/v1/s3"
+  AWS_REGION: "sa-east-1"
   AWS_KEY_ID: "123"
   AWS_SECRET_ACCESS_KEY: "123"
-  AWS_BUCKET_NAME: "123"
+  AWS_BUCKET_NAME: "snapify-videos"
   NEXTAUTH_URL: "http://localhost:3000/"
   NEXTAUTH_SECRET: "5feaf48"
-  GOOGLE_CLIENT_ID: "abc"
-  GOOGLE_CLIENT_SECRET: "abc"
   GITHUB_ID: "abc"
   GITHUB_SECRET: "abc"
+  ALLOWED_EMAILS: "account@e2e.net"
+  CRON_SECRET: "ci-secret-at-least-16-characters"
 
 jobs:
   build:
@@ -24,13 +25,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v4
         with:
-          node-version: 18
-          cache: 'npm'
+          node-version: 22
+          cache: "npm"
 
       - name: Install Dependencies
         run: npm ci
+
+      - name: Validate Prisma schema
+        run: npm run prisma:validate
 
       - name: Typecheck
         run: npm run typecheck
@@ -38,5 +42,5 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Print Environment Variable
-        run: echo $MY_ENV_VAR
+      - name: Production build
+        run: npm run build

@@ -3,38 +3,28 @@ import { Fragment, useState } from "react";
 import { ModernSwitch } from "~/components/ModernSwitch";
 import { api, type RouterOutputs } from "~/utils/api";
 import ExpireDateSelectMenu from "~/components/ExpireDateSelectMenu";
-import { usePostHog } from "posthog-js/react";
 
 interface Props {
-  video: RouterOutputs["video"]["get"];
+  video: Extract<RouterOutputs["video"]["get"], { isOwner: true }>;
 }
 
 export function ShareModal({ video }: Props) {
   const utils = api.useContext();
   const [open, setOpen] = useState<boolean>(false);
-  const posthog = usePostHog();
 
   const openModal = () => {
     setOpen(true);
-    posthog?.capture("open video share modal", {
-      videoSharing: video.sharing,
-      videoId: video.id,
-    });
   };
 
   const closeModal = () => {
     setOpen(false);
-    posthog?.capture("close video share modal", {
-      videoSharing: video.sharing,
-      videoId: video.id,
-    });
   };
 
   const setSharingMutation = api.video.setSharing.useMutation({
     onMutate: async ({ videoId, sharing }) => {
       await utils.video.get.cancel();
       const previousValue = utils.video.get.getData({ videoId });
-      if (previousValue) {
+      if (previousValue?.isOwner) {
         utils.video.get.setData({ videoId }, { ...previousValue, sharing });
       }
       return { previousValue };
@@ -52,7 +42,7 @@ export function ShareModal({ video }: Props) {
       onMutate: async ({ videoId, delete_after_link_expires }) => {
         await utils.video.get.cancel();
         const previousValue = utils.video.get.getData({ videoId });
-        if (previousValue) {
+        if (previousValue?.isOwner) {
           utils.video.get.setData(
             { videoId },
             { ...previousValue, delete_after_link_expires }
@@ -76,11 +66,6 @@ export function ShareModal({ video }: Props) {
     setTimeout(() => {
       setLinkCopied(false);
     }, 5000);
-
-    posthog?.capture("public video link copied", {
-      videoSharing: video.sharing,
-      videoId: video.id,
-    });
   };
 
   return (

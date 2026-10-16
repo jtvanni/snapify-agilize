@@ -7,7 +7,6 @@ import Head from "next/head";
 import { getProviders, signIn } from "next-auth/react";
 import { getServerSession } from "next-auth";
 import { authOptions } from "~/server/auth";
-import Link from "next/link";
 
 const SignIn = ({
   providers,
@@ -15,10 +14,10 @@ const SignIn = ({
   return (
     <>
       <Head>
-        <title>Sign in to Snapify</title>
+        <title>Entrar | Snapify Agilize</title>
         <meta
           name="description"
-          content="Share high-quality videos asynchronously and collaborate on your own schedule"
+          content="Acesso interno da equipe Agilize IA"
         />
         <link rel="icon" href="/favicon.ico" />
       </Head>
@@ -26,7 +25,7 @@ const SignIn = ({
         <div className="bg-white px-4 py-8 shadow sm:rounded-lg sm:px-10">
           <div className="animate-fade-in flex flex-col justify-center text-center">
             <span className="text-sm font-medium text-gray-700">
-              Sign in with
+              Acesso interno da Agilize IA
             </span>
             <div className="mt-6 grid grid-cols-2 gap-3">
               {Object.values(providers).map((provider) => (
@@ -46,10 +45,8 @@ const SignIn = ({
                 </button>
               ))}
             </div>
-            <p className="prose prose-sm mx-auto mt-6 max-w-[18rem] text-xs text-gray-500">
-              By signing in, you agree to our{" "}
-              <Link href="/legal/terms">Terms of Service</Link> and{" "}
-              <Link href="/legal/privacy-policy">Privacy Policy</Link>.
+            <p className="mx-auto mt-6 max-w-[18rem] text-xs text-gray-500">
+              Somente colaboradores autorizados podem acessar o painel.
             </p>
           </div>
         </div>

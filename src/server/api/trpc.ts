@@ -40,9 +40,7 @@ const createInnerTRPCContext = (opts: CreateContextOptions) => {
   return {
     session: opts.session,
     prisma,
-    s3,
-    posthog,
-    stripe,
+    storage,
     req: opts.req,
     res: opts.res,
   };
@@ -77,10 +75,8 @@ export const createTRPCContext = async (opts: CreateNextContextOptions) => {
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import { ZodError } from "zod";
-import { s3 } from "~/server/aws/s3";
-import { stripe } from "~/server/stripe";
+import { storage } from "~/server/aws/s3";
 import { type NextApiRequest, type NextApiResponse } from "next";
-import { posthog } from "~/server/posthog";
 import { rateLimit } from "~/server/rateLimit";
 
 const t = initTRPC.context<typeof createTRPCContext>().create({

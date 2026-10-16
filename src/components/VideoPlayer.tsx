@@ -1,17 +1,14 @@
 import "@vidstack/react/player/styles/base.css";
 
-import React, { useEffect, useRef } from "react";
+import React, { useRef } from "react";
 
 import {
   isHLSProvider,
   MediaPlayer,
   MediaProvider,
   Poster,
-  type MediaCanPlayDetail,
-  type MediaCanPlayEvent,
   type MediaPlayerInstance,
   type MediaProviderAdapter,
-  type MediaProviderChangeEvent,
 } from "@vidstack/react";
 
 import { VideoLayout } from "./VideoLayout";
@@ -24,30 +21,11 @@ interface Props {
 export default function VideoPlayer({ video_url, thumbnailUrl }: Props) {
   const player = useRef<MediaPlayerInstance>(null);
 
-  useEffect(() => {
-    // Subscribe to state updates.
-    return player.current!.subscribe(({ paused, viewType }) => {
-      // console.log('is paused?', '->', state.paused);
-      // console.log('is audio view?', '->', state.viewType === 'audio');
-    });
-  }, []);
-
-  function onProviderChange(
-    provider: MediaProviderAdapter | null,
-    nativeEvent: MediaProviderChangeEvent
-  ) {
+  function onProviderChange(provider: MediaProviderAdapter | null) {
     // We can configure provider's here.
     if (isHLSProvider(provider)) {
       provider.config = {};
     }
-  }
-
-  // We can listen for the `can-play` event to be notified when the player is ready.
-  function onCanPlay(
-    detail: MediaCanPlayDetail,
-    nativeEvent: MediaCanPlayEvent
-  ) {
-    // ...
   }
 
   return (
@@ -62,7 +40,6 @@ export default function VideoPlayer({ video_url, thumbnailUrl }: Props) {
       crossOrigin
       playsInline
       onProviderChange={onProviderChange}
-      onCanPlay={onCanPlay}
       ref={player}
       keyTarget="document"
     >

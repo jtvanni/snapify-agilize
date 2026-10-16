@@ -7,7 +7,6 @@ import Image from "next/image";
 
 const navigation = [
   { name: "Overview", href: "/" },
-  { name: "Pricing", href: "/pricing" },
   { name: "Github", href: "https://github.com/MarconLP/snapify" },
 ];
 

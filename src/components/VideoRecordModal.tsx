@@ -4,12 +4,10 @@ const Recorder = dynamic(() => import("~/components/Recorder"), { ssr: false });
 import dynamic from "next/dynamic";
 import { useAtom } from "jotai";
 import recordVideoModalOpen from "~/atoms/recordVideoModalOpen";
-import { usePostHog } from "posthog-js/react";
 
 export default function VideoRecordModal() {
   const [open, setOpen] = useAtom(recordVideoModalOpen);
   const [step, setStep] = useState<"pre" | "in" | "post">("pre");
-  const posthog = usePostHog();
 
   function closeModal() {
     setStep("pre");
@@ -18,8 +16,6 @@ export default function VideoRecordModal() {
 
   const handleClose = () => {
     if (step === "pre") closeModal();
-
-    posthog?.capture("cancel video pre-recording");
   };
 
   return (
