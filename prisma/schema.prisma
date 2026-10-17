@@ -26,7 +26,27 @@ model Video {
   delete_after_link_expires Boolean   @default(false)
   shareLinkExpiresAt        DateTime?
   linkShareSeo              Boolean   @default(false)
+  sharePinHash              String?
+  shareAccessVersion        Int       @default(0)
+  folderId                  String?
   user                      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  folder                    Folder?   @relation(fields: [folderId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([folderId])
+}
+
+model Folder {
+  id                 String   @id @default(cuid())
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  name               String
+  userId             String
+  sharing            Boolean  @default(false)
+  sharePinHash       String?
+  shareAccessVersion Int      @default(0)
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  videos             Video[]
 
   @@index([userId])
 }
@@ -71,6 +91,7 @@ model User {
   accounts      Account[]
   sessions      Session[]
   videos        Video[]
+  folders       Folder[]
 }
 
 model VerificationToken {

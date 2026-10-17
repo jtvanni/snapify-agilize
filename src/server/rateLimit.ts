@@ -12,3 +12,15 @@ export const rateLimit =
         limiter: Ratelimit.slidingWindow(60, "60 s"),
       })
     : null;
+
+export const sharePinRateLimit =
+  !!env.UPSTASH_REDIS_REST_URL && !!env.UPSTASH_REDIS_REST_TOKEN
+    ? new Ratelimit({
+        redis: new Redis({
+          url: env.UPSTASH_REDIS_REST_URL,
+          token: env.UPSTASH_REDIS_REST_TOKEN,
+        }),
+        limiter: Ratelimit.slidingWindow(5, "5 m"),
+        prefix: "snapify:share-pin",
+      })
+    : null;

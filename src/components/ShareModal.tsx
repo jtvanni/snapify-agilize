@@ -1,5 +1,5 @@
 import { Dialog, Transition } from "@headlessui/react";
-import { Check, Copy, Share2, X } from "lucide-react";
+import { Check, Copy, KeyRound, Share2, X } from "lucide-react";
 import { Fragment, useState } from "react";
 
 import ExpireDateSelectMenu from "~/components/ExpireDateSelectMenu";
@@ -15,6 +15,7 @@ export function ShareModal({ video }: Props) {
   const utils = api.useContext();
   const [open, setOpen] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [pin, setPin] = useState("");
 
   const setSharingMutation = api.video.setSharing.useMutation({
     onMutate: async ({ videoId, sharing }) => {
@@ -46,6 +47,13 @@ export function ShareModal({ video }: Props) {
     onError: (error, { videoId }, context) => {
       if (context?.previousValue) utils.video.get.setData({ videoId }, context.previousValue);
       console.error(error.message);
+    },
+  });
+
+  const setPinMutation = api.video.setPin.useMutation({
+    onSuccess: async () => {
+      setPin("");
+      await utils.video.get.invalidate({ videoId: video.id });
     },
   });
 
@@ -131,6 +139,45 @@ export function ShareModal({ video }: Props) {
                         {linkCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                         {linkCopied ? "Link copiado" : "Copiar link público"}
                       </Button>
+
+                      <div className="mt-4 border-t border-line pt-4">
+                        <div className="flex items-center gap-2 text-sm font-semibold text-navy-900">
+                          <KeyRound className="h-4 w-4 text-navy-600" />
+                          {video.pinProtected ? "PIN ativado" : "Proteger com PIN"}
+                        </div>
+                        <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                          Quem abrir este link precisará informar quatro números.
+                        </p>
+                        <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                          <input
+                            value={pin}
+                            onChange={(event) => setPin(event.currentTarget.value.replace(/\D/g, "").slice(0, 4))}
+                            inputMode="numeric"
+                            pattern="\d{4}"
+                            maxLength={4}
+                            placeholder="0000"
+                            aria-label="PIN de quatro números"
+                            className="h-10 min-w-0 flex-1 border border-line bg-white px-3 text-center font-mono tracking-[0.35em] text-navy-900 outline-none focus:border-navy-600 focus:ring-1 focus:ring-navy-600"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={pin.length !== 4 || setPinMutation.isLoading}
+                            onClick={() => setPinMutation.mutate({ videoId: video.id, pin })}
+                          >
+                            {video.pinProtected ? "Trocar PIN" : "Ativar PIN"}
+                          </Button>
+                          {video.pinProtected ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              onClick={() => setPinMutation.mutate({ videoId: video.id, pin: null })}
+                            >
+                              Remover
+                            </Button>
+                          ) : null}
+                        </div>
+                      </div>
 
                       <div className="mt-4 flex items-center justify-between gap-4 border-t border-line pt-4">
                         <span className="text-sm font-medium text-navy-900">Expiração do link</span>

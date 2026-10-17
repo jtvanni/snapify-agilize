@@ -4,9 +4,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { useAtom } from "jotai";
-import { MonitorUp, Video } from "lucide-react";
+import { Folder, LockKeyhole, MonitorUp, Video } from "lucide-react";
 
 import AppHeader from "~/components/AppHeader";
+import { CreateFolderDialog } from "~/components/CreateFolderDialog";
 import NewVideoMenu from "~/components/NewVideoMenu";
 import ProfileMenu from "~/components/ProfileMenu";
 import { Button } from "~/components/ui/Button";
@@ -25,6 +26,11 @@ const VideoList: NextPage = () => {
   const { data: videos, isLoading } = api.video.getAll.useQuery(undefined, {
     enabled: status === "authenticated",
   });
+  const { data: folders, isLoading: foldersLoading } = api.folder.getAll.useQuery(undefined, {
+    enabled: status === "authenticated",
+  });
+  const unfiledVideos = videos?.filter((video) => !video.folder);
+  const libraryIsEmpty = !foldersLoading && !isLoading && !folders?.length && !videos?.length;
 
   const openRecordModal = () => {
     if (!navigator?.mediaDevices?.getDisplayMedia) {
@@ -46,6 +52,7 @@ const VideoList: NextPage = () => {
             <>
               <VideoRecordModal />
               <VideoUploadModal />
+              <CreateFolderDialog />
               <NewVideoMenu />
               {status === "authenticated" ? <ProfileMenu /> : null}
             </>
@@ -67,7 +74,24 @@ const VideoList: NextPage = () => {
             ) : null}
           </div>
 
-          {!isLoading && videos?.length === 0 ? (
+          {folders?.length ? (
+            <div className="mb-8">
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-[0.12em] text-navy-600">Pastas</h2>
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3">
+                {folders.map((folder) => (
+                  <Link key={folder.id} href={`/folders/${folder.id}`} className="group border border-line bg-white p-4 transition-colors hover:border-navy-200 hover:bg-navy-50">
+                    <div className="flex items-start justify-between gap-4"><div className="grid h-10 w-10 place-items-center bg-navy-100 text-navy-900"><Folder className="h-5 w-5" /></div>{folder.pinProtected ? <LockKeyhole className="h-4 w-4 text-navy-600" aria-label="Protegida por PIN" /> : null}</div>
+                    <h3 className="mt-4 truncate text-sm font-semibold text-navy-900">{folder.name}</h3>
+                    <p className="mt-1 text-xs text-muted-foreground">{folder._count.videos} {folder._count.videos === 1 ? "vídeo" : "vídeos"}{folder.sharing ? " · Compartilhada" : ""}</p>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {unfiledVideos?.length ? <h2 className="mb-3 text-sm font-semibold uppercase tracking-[0.12em] text-navy-600">Sem pasta</h2> : null}
+
+          {libraryIsEmpty ? (
             <div className="grid min-h-[320px] place-items-center border border-line bg-white p-6 text-center">
               <div className="max-w-md">
                 <div className="mx-auto grid h-12 w-12 place-items-center bg-navy-100 text-navy-900">
@@ -91,15 +115,15 @@ const VideoList: NextPage = () => {
                 </div>
               </div>
             </div>
-          ) : (
+          ) : unfiledVideos?.length || isLoading ? (
             <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-px border border-line bg-line">
-              {videos?.map((video) => <VideoCard key={video.id} {...video} />)}
+              {unfiledVideos?.map((video) => <VideoCard key={video.id} {...video} />)}
               {isLoading &&
                 Array.from({ length: 8 }, (_, index) => (
                   <VideoCardSkeleton key={index} />
                 ))}
             </div>
-          )}
+          ) : null}
         </section>
       </main>
     </>

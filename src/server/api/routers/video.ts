@@ -6,6 +6,14 @@ import {
   protectedProcedure,
   publicProcedure,
 } from "~/server/api/trpc";
+import {
+  canAttemptSharePin,
+  grantShareAccess,
+  hashSharePin,
+  hasShareAccess,
+  sharePinPattern,
+  verifySharePin,
+} from "~/server/shareAccess";
 
 const videoContentType = z.enum(["video/webm", "video/mp4"]);
 
@@ -14,6 +22,7 @@ export const videoRouter = createTRPCRouter({
     const videos = await ctx.prisma.video.findMany({
       where: { userId: ctx.session.user.id },
       orderBy: { createdAt: "desc" },
+      include: { folder: { select: { id: true, name: true } } },
     });
 
     return Promise.all(
@@ -34,16 +43,52 @@ export const videoRouter = createTRPCRouter({
         where: { id: input.videoId },
         include: {
           user: { select: { name: true, image: true } },
+          folder: true,
         },
       });
       if (!video) throw new TRPCError({ code: "NOT_FOUND" });
 
       const isOwner = video.userId === ctx.session?.user.id;
-      const shareIsActive =
+      const videoShareIsActive =
         video.sharing &&
         (!video.shareLinkExpiresAt || video.shareLinkExpiresAt > new Date());
+      const folderShareIsActive = !!video.folder?.sharing;
+      const videoShareAuthorized =
+        videoShareIsActive &&
+        (!video.sharePinHash ||
+          hasShareAccess(ctx.req, "video", video.id, video.shareAccessVersion));
+      const folderShareAuthorized =
+        !!video.folder &&
+        folderShareIsActive &&
+        (!video.folder.sharePinHash ||
+          hasShareAccess(
+            ctx.req,
+            "folder",
+            video.folder.id,
+            video.folder.shareAccessVersion
+          ));
 
-      if (!isOwner && !shareIsActive) {
+      if (!isOwner && !videoShareAuthorized && !folderShareAuthorized) {
+        if (folderShareIsActive && video.folder?.sharePinHash) {
+          return {
+            locked: true as const,
+            id: video.id,
+            title: video.title,
+            isOwner: false as const,
+            unlockScope: "folder" as const,
+            folder: { id: video.folder.id, name: video.folder.name },
+          };
+        }
+        if (videoShareIsActive && video.sharePinHash) {
+          return {
+            locked: true as const,
+            id: video.id,
+            title: video.title,
+            isOwner: false as const,
+            unlockScope: "video" as const,
+            folder: null,
+          };
+        }
         throw new TRPCError({ code: "FORBIDDEN" });
       }
 
@@ -53,12 +98,17 @@ export const videoRouter = createTRPCRouter({
       );
 
       const publicVideo = {
+        locked: false as const,
         id: video.id,
         title: video.title,
         createdAt: video.createdAt,
         user: video.user,
         video_url: videoUrl,
         thumbnailUrl,
+        folder:
+          video.folder && (isOwner || folderShareIsActive)
+            ? { id: video.folder.id, name: video.folder.name }
+            : null,
       };
 
       if (!isOwner) {
@@ -66,8 +116,12 @@ export const videoRouter = createTRPCRouter({
       }
 
       return {
-        ...video,
         ...publicVideo,
+        sharing: video.sharing,
+        delete_after_link_expires: video.delete_after_link_expires,
+        shareLinkExpiresAt: video.shareLinkExpiresAt,
+        linkShareSeo: video.linkShareSeo,
+        pinProtected: !!video.sharePinHash,
         isOwner: true as const,
       };
     }),
@@ -112,8 +166,55 @@ export const videoRouter = createTRPCRouter({
       await ownedVideo(ctx, input.videoId);
       return ctx.prisma.video.update({
         where: { id: input.videoId },
-        data: { sharing: input.sharing },
+        data: {
+          sharing: input.sharing,
+          ...(!input.sharing ? { shareAccessVersion: { increment: 1 } } : {}),
+        },
       });
+    }),
+
+  setPin: protectedProcedure
+    .input(
+      z.object({
+        videoId: z.string().cuid(),
+        pin: z.string().regex(sharePinPattern).nullable(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      await ownedVideo(ctx, input.videoId);
+      return ctx.prisma.video.update({
+        where: { id: input.videoId },
+        data: {
+          sharePinHash: input.pin ? await hashSharePin(input.pin) : null,
+          shareAccessVersion: { increment: 1 },
+        },
+      });
+    }),
+
+  unlock: publicProcedure
+    .input(
+      z.object({
+        videoId: z.string().cuid(),
+        pin: z.string().regex(sharePinPattern),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const video = await ctx.prisma.video.findUnique({ where: { id: input.videoId } });
+      const shareIsActive =
+        !!video?.sharing &&
+        (!video.shareLinkExpiresAt || video.shareLinkExpiresAt > new Date());
+      if (!video || !shareIsActive || !video.sharePinHash) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+      if (!(await canAttemptSharePin(ctx.req, `video:${video.id}`))) {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS" });
+      }
+      if (!(await verifySharePin(input.pin, video.sharePinHash))) {
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "PIN incorreto" });
+      }
+
+      grantShareAccess(ctx.req, ctx.res, "video", video.id, video.shareAccessVersion);
+      return { success: true };
     }),
 
   setDeleteAfterLinkExpires: protectedProcedure
