@@ -12,6 +12,31 @@ test.describe.serial("biblioteca de demonstrações", () => {
     await expect(page.getByRole("menuitem", { name: "Enviar um vídeo" })).toBeVisible();
   });
 
+  test("oferece três perfis e seleciona a qualidade equilibrada por padrão", async ({ page }) => {
+    await page.goto("http://localhost:3000/videos");
+    await page.getByRole("button", { name: /Nova demonstração/ }).click();
+    await page.getByRole("menuitem", { name: "Gravar a tela" }).click();
+
+    await expect(page.getByRole("button", { name: /Econômica/ })).toHaveAttribute(
+      "aria-pressed",
+      "false"
+    );
+    await expect(page.getByRole("button", { name: /Equilibrada/ })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
+    await expect(page.getByRole("button", { name: /Alta/ })).toHaveAttribute(
+      "aria-pressed",
+      "false"
+    );
+
+    await page.getByRole("button", { name: /Econômica/ }).click();
+    await expect(page.getByRole("button", { name: /Econômica/ })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
+  });
+
   test("envia um vídeo para a biblioteca", async ({ page }) => {
     await page.goto("http://localhost:3000/videos");
     await page.getByRole("button", { name: /Nova demonstração/ }).click();

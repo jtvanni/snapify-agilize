@@ -26,6 +26,19 @@ import generateThumbnail from "~/utils/generateThumbnail";
 import * as EBML from "ts-ebml";
 import VideoPlayer from "~/components/VideoPlayer";
 import { Button } from "~/components/ui/Button";
+import {
+  DEFAULT_VIDEO_QUALITY,
+  estimateRemainingSeconds,
+  formatVideoBytes,
+  formatVideoDuration,
+  MAX_VIDEO_BYTES,
+  VIDEO_QUALITY_PROFILES,
+  VIDEO_SIZE_WARNING_BYTES,
+  type VideoQualityId,
+} from "~/utils/videoLimits";
+
+const RECORDING_TIMESLICE_MS = 1_000;
+const FINAL_CHUNK_RESERVE_BYTES = 500_000;
 
 interface Props {
   closeModal: () => void;
@@ -40,9 +53,13 @@ interface Props {
 }
 
 export default function Recorder({ closeModal, step, setStep }: Props) {
-  const [steam, setStream] = useState<null | MediaStream>(null);
   const [blob, setBlob] = useState<null | Blob>(null);
   const recorderRef = useRef<null | RecordRTC>(null);
+  const streamRef = useRef<null | MediaStream>(null);
+  const stoppingRef = useRef(false);
+  const discardedRef = useRef(false);
+  const durationRef = useRef(0);
+  const recordedBytesRef = useRef(0);
   const [pause, setPause] = useState<boolean>(false);
   const [audioDevices, setAudioDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedDevice, setSelectedDevice] = useState<MediaDeviceInfo | null>(
@@ -55,8 +72,23 @@ export default function Recorder({ closeModal, step, setStep }: Props) {
   const getSignedUrl = api.video.getUploadUrl.useMutation();
   const abortUpload = api.video.abortUpload.useMutation();
   const [duration, setDuration] = useState<number>(0);
+  const [recordedBytes, setRecordedBytes] = useState(0);
+  const [qualityId, setQualityId] =
+    useState<VideoQualityId>(DEFAULT_VIDEO_QUALITY);
+  const [stoppedAtLimit, setStoppedAtLimit] = useState(false);
+  const [sizeError, setSizeError] = useState<string>();
   const videoRef = useRef<null | HTMLVideoElement>(null);
   const [previewUrl, setPreviewUrl] = useState<string>();
+  const selectedProfile = VIDEO_QUALITY_PROFILES[qualityId];
+  const estimatedSecondsRemaining = estimateRemainingSeconds(
+    recordedBytes,
+    duration,
+    selectedProfile
+  );
+
+  useEffect(() => {
+    durationRef.current = duration;
+  }, [duration]);
 
   useEffect(() => {
     if (!blob) {
@@ -69,11 +101,21 @@ export default function Recorder({ closeModal, step, setStep }: Props) {
   }, [blob]);
 
   const handleRecording = async () => {
+    setBlob(null);
+    setSizeError(undefined);
+    setStoppedAtLimit(false);
+    setRecordedBytes(0);
+    setDuration(0);
+    recordedBytesRef.current = 0;
+    durationRef.current = 0;
+    stoppingRef.current = false;
+    discardedRef.current = false;
+
     const screenStream = await navigator.mediaDevices.getDisplayMedia({
       video: {
-        width: 1920,
-        height: 1080,
-        frameRate: 30,
+        width: selectedProfile.width,
+        height: selectedProfile.height,
+        frameRate: selectedProfile.frameRate,
       },
       audio: {
         echoCancellation: true,
@@ -103,15 +145,28 @@ export default function Recorder({ closeModal, step, setStep }: Props) {
 
     const firstVideoTrack = screenStream.getVideoTracks()[0];
     if (firstVideoTrack) {
-      firstVideoTrack.addEventListener("ended", () => handleStop());
+      firstVideoTrack.addEventListener("ended", () => stopRecording());
     }
 
-    setStream(mediaStream);
+    streamRef.current = mediaStream;
     recorderRef.current = new RecordRTC(mediaStream, {
       type: "video",
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-      // @ts-ignore
-      mimeType: 'video/webm;codecs="vp9,opus"',
+      mimeType: "video/webm;codecs=vp9",
+      videoBitsPerSecond: selectedProfile.videoBitsPerSecond,
+      audioBitsPerSecond: selectedProfile.audioBitsPerSecond,
+      timeSlice: RECORDING_TIMESLICE_MS,
+      ondataavailable: (chunk: Blob) => {
+        const nextSize = recordedBytesRef.current + chunk.size;
+        recordedBytesRef.current = nextSize;
+        setRecordedBytes(nextSize);
+
+        if (
+          nextSize >= MAX_VIDEO_BYTES - FINAL_CHUNK_RESERVE_BYTES &&
+          !stoppingRef.current
+        ) {
+          stopRecording(true);
+        }
+      },
     });
     recorderRef.current.startRecording();
 
@@ -134,7 +189,7 @@ export default function Recorder({ closeModal, step, setStep }: Props) {
 
       const refinedMetadataBuf = tools.makeMetadataSeekable(
         reader.metadatas,
-        duration * 1000,
+        durationRef.current * 1000,
         reader.cues
       );
 
@@ -148,34 +203,63 @@ export default function Recorder({ closeModal, step, setStep }: Props) {
     fileReader.readAsArrayBuffer(inputBlob);
   }
 
-  const handleStop = () => {
-    if (recorderRef.current === null) return;
-    recorderRef.current.stopRecording(() => {
-      if (recorderRef.current) {
-        getSeekableBlob(recorderRef.current.getBlob(), function (fixedBlob) {
-          setBlob(fixedBlob);
-        });
-        steam?.getTracks().map((track) => track.stop());
-      }
-    });
-
+  function stopRecording(reachedLimit = false) {
+    const recorder = recorderRef.current;
+    if (!recorder || stoppingRef.current) return;
+    stoppingRef.current = true;
+    setPause(false);
+    setStoppedAtLimit(reachedLimit);
     setStep("post");
-  };
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+
+    const finishRecording = () => {
+      recorder.stopRecording(() => {
+        if (discardedRef.current) return;
+        getSeekableBlob(recorder.getBlob(), (fixedBlob) => {
+          if (discardedRef.current) return;
+          setRecordedBytes(fixedBlob.size);
+          recordedBytesRef.current = fixedBlob.size;
+          setBlob(fixedBlob);
+          if (fixedBlob.size > MAX_VIDEO_BYTES) {
+            setSizeError(
+              `A gravação terminou com ${formatVideoBytes(fixedBlob.size)} e não pode ser enviada. O limite é ${formatVideoBytes(MAX_VIDEO_BYTES)}.`
+            );
+          }
+        });
+      });
+    };
+
+    if (recorder.state === "paused") {
+      recorder.resumeRecording();
+      window.setTimeout(finishRecording, 0);
+    } else {
+      finishRecording();
+    }
+  }
 
   const handleDelete = () => {
+    discardedRef.current = true;
     setBlob(null);
-    steam?.getTracks().forEach((track) => track.stop());
+    streamRef.current?.getTracks().forEach((track) => track.stop());
     if (step === "in" && recorderRef.current) {
+      stoppingRef.current = true;
+      if (recorderRef.current.state === "paused") {
+        recorderRef.current.resumeRecording();
+      }
       recorderRef.current.stopRecording();
     }
     setPause(false);
     setDuration(0);
+    setRecordedBytes(0);
+    setStoppedAtLimit(false);
+    setSizeError(undefined);
+    streamRef.current = null;
+    recorderRef.current = null;
     closeModal();
   };
 
   const handlePause = () => {
     if (recorderRef.current) {
-      console.log(recorderRef.current?.state);
       if (pause) {
         recorderRef.current?.resumeRecording();
       } else {
@@ -216,6 +300,10 @@ export default function Recorder({ closeModal, step, setStep }: Props) {
 
   const handleUpload = async () => {
     if (!blob || !videoRef.current) return;
+    if (blob.size > MAX_VIDEO_BYTES) {
+      setSizeError(`O limite para envio é ${formatVideoBytes(MAX_VIDEO_BYTES)}.`);
+      return;
+    }
 
     const dateString = getRecordingFileName();
     setSubmitting(true);
@@ -226,6 +314,7 @@ export default function Recorder({ closeModal, step, setStep }: Props) {
         await getSignedUrl.mutateAsync({
           key: dateString,
           contentType: "video/webm",
+          size: blob.size,
         });
       videoId = id;
 
@@ -331,6 +420,40 @@ export default function Recorder({ closeModal, step, setStep }: Props) {
               </Transition>
             </div>
           </Listbox>
+          <fieldset className="mt-6">
+            <legend className="text-sm font-semibold text-navy-900">
+              Qualidade da gravação
+            </legend>
+            <div className="mt-2 grid gap-2 sm:grid-cols-3">
+              {Object.values(VIDEO_QUALITY_PROFILES).map((profile) => {
+                const selected = profile.id === qualityId;
+                return (
+                  <button
+                    key={profile.id}
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => setQualityId(profile.id)}
+                    className={`border p-3 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-navy-600 focus-visible:ring-offset-2 ${
+                      selected
+                        ? "border-navy-600 bg-navy-50"
+                        : "border-line bg-white hover:border-navy-300"
+                    }`}
+                  >
+                    <span className="flex items-center gap-2 text-sm font-semibold text-navy-900">
+                      {selected ? <Check className="h-4 w-4 text-navy-600" /> : null}
+                      {profile.label}
+                    </span>
+                    <span className="mt-1 block text-xs leading-5 text-muted-foreground">
+                      {profile.description}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              A duração é uma estimativa. A gravação será finalizada automaticamente antes de {formatVideoBytes(MAX_VIDEO_BYTES)}.
+            </p>
+          </fieldset>
           <Button
             type="button"
             className="mt-6 w-full"
@@ -348,7 +471,7 @@ export default function Recorder({ closeModal, step, setStep }: Props) {
           <Tooltip title="Finalizar gravação">
             <button
               type="button"
-              onClick={handleStop}
+              onClick={() => stopRecording()}
               className="flex h-10 items-center gap-2 px-3 text-lg font-semibold text-navy-900 transition-colors hover:bg-white"
             >
               <Square className="h-5 w-5 fill-destructive text-destructive" aria-hidden="true" />
@@ -383,9 +506,35 @@ export default function Recorder({ closeModal, step, setStep }: Props) {
             </button>
           </Tooltip>
           </div>
-          <p className="mt-4 text-xs text-muted-foreground">
-            Volte a esta janela para pausar ou finalizar.
-          </p>
+          <div className="mt-5 w-full max-w-md" aria-live="polite">
+            <div className="flex items-center justify-between gap-4 text-xs text-muted-foreground">
+              <span>
+                {formatVideoBytes(recordedBytes)} de {formatVideoBytes(MAX_VIDEO_BYTES)}
+              </span>
+              <span>cerca de {formatVideoDuration(estimatedSecondsRemaining)} restantes</span>
+            </div>
+            <div className="mt-2 h-2 overflow-hidden bg-navy-100">
+              <div
+                className={`h-full transition-[width] duration-300 ${
+                  recordedBytes >= VIDEO_SIZE_WARNING_BYTES ? "bg-signal" : "bg-navy-600"
+                }`}
+                style={{
+                  width: `${Math.min(100, (recordedBytes / MAX_VIDEO_BYTES) * 100)}%`,
+                }}
+              />
+            </div>
+            <p
+              className={`mt-3 text-center text-xs ${
+                recordedBytes >= VIDEO_SIZE_WARNING_BYTES
+                  ? "font-semibold text-signal"
+                  : "text-muted-foreground"
+              }`}
+            >
+              {recordedBytes >= VIDEO_SIZE_WARNING_BYTES
+                ? "A gravação está próxima do limite e será finalizada automaticamente."
+                : "Volte a esta janela para pausar ou finalizar."}
+            </p>
+          </div>
         </div>
       ) : null}
       {step === "post" ? (
@@ -407,10 +556,28 @@ export default function Recorder({ closeModal, step, setStep }: Props) {
               />
             </div>
           ) : null}
+          {stoppedAtLimit ? (
+            <p className="mt-4 border border-navy-200 bg-navy-50 p-3 text-sm text-navy-900" role="status">
+              A gravação foi finalizada automaticamente para permanecer abaixo do limite de {formatVideoBytes(MAX_VIDEO_BYTES)}.
+            </p>
+          ) : null}
+          {sizeError ? (
+            <p className="mt-4 border border-red-200 bg-red-50 p-3 text-sm text-destructive" role="alert">
+              {sizeError} Você ainda pode baixar o arquivo no dispositivo.
+            </p>
+          ) : blob ? (
+            <p className="mt-3 text-xs text-muted-foreground">
+              Tamanho final: {formatVideoBytes(blob.size)}
+            </p>
+          ) : (
+            <p className="mt-3 text-xs text-muted-foreground" role="status">
+              Preparando a prévia e calculando o tamanho final...
+            </p>
+          )}
           <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:items-center">
             <Button
               type="button"
-              disabled={submitting}
+              disabled={submitting || !blob || !!sizeError}
               onClick={() => void handleUpload()}
             >
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <CloudUpload className="h-4 w-4" />}

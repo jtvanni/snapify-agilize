@@ -14,8 +14,7 @@ import {
   sharePinPattern,
   verifySharePin,
 } from "~/server/shareAccess";
-
-const videoContentType = z.enum(["video/webm", "video/mp4"]);
+import { videoUploadInput } from "~/server/api/videoUploadInput";
 
 export const videoRouter = createTRPCRouter({
   getAll: protectedProcedure.query(async ({ ctx }) => {
@@ -127,12 +126,7 @@ export const videoRouter = createTRPCRouter({
     }),
 
   getUploadUrl: protectedProcedure
-    .input(
-      z.object({
-        key: z.string().trim().min(1).max(200),
-        contentType: videoContentType,
-      })
-    )
+    .input(videoUploadInput)
     .mutation(async ({ ctx, input }) => {
       const video = await ctx.prisma.video.create({
         data: { userId: ctx.session.user.id, title: input.key },
@@ -142,7 +136,8 @@ export const videoRouter = createTRPCRouter({
         const urls = await ctx.storage.createUploadUrls(
           video.userId,
           video.id,
-          input.contentType
+          input.contentType,
+          input.size
         );
         return { success: true, id: video.id, ...urls };
       } catch (error) {

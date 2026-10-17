@@ -42,7 +42,8 @@ export const storage = {
   async createUploadUrls(
     userId: string,
     videoId: string,
-    contentType: VideoContentType
+    contentType: VideoContentType,
+    size: number
   ) {
     const keys = keysFor(userId, videoId);
     const [signedVideoUrl, signedThumbnailUrl] = await Promise.all([
@@ -52,6 +53,7 @@ export const storage = {
           Bucket: BUCKET,
           Key: keys.video,
           ContentType: contentType,
+          ContentLength: size,
         }),
         { expiresIn: UPLOAD_URL_TTL_SECONDS }
       ),

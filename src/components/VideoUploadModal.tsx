@@ -9,12 +9,19 @@ import uploadVideoModalOpen from "~/atoms/uploadVideoModalOpen";
 import { Button } from "~/components/ui/Button";
 import generateThumbnail from "~/utils/generateThumbnail";
 import { api } from "~/utils/api";
+import {
+  formatVideoBytes,
+  getVideoFileError,
+  isSupportedVideoContentType,
+  MAX_VIDEO_BYTES,
+} from "~/utils/videoLimits";
 
 export default function VideoUploadModal() {
   const [open, setOpen] = useAtom(uploadVideoModalOpen);
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [file, setFile] = useState<File>();
+  const [fileError, setFileError] = useState<string>();
   const [previewUrl, setPreviewUrl] = useState<string>();
   const getSignedUrl = api.video.getUploadUrl.useMutation();
   const abortUpload = api.video.abortUpload.useMutation();
@@ -35,16 +42,36 @@ export default function VideoUploadModal() {
     if (submitting) return;
     setOpen(false);
     setFile(undefined);
+    setFileError(undefined);
   };
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-    setFile(event.target.files?.[0]);
+    const nextFile = event.target.files?.[0];
+    setFileError(undefined);
+
+    if (!nextFile) {
+      setFile(undefined);
+      return;
+    }
+    const validationError = getVideoFileError(nextFile);
+    if (validationError) {
+      setFile(undefined);
+      setFileError(validationError);
+      event.currentTarget.value = "";
+      return;
+    }
+
+    setFile(nextFile);
   };
 
   const handleSubmit = async () => {
     if (!file) return;
-    if (file.type !== "video/webm" && file.type !== "video/mp4") {
-      alert("Envie um arquivo WebM ou MP4.");
+    const validationError = getVideoFileError(file);
+    if (validationError) {
+      setFileError(validationError);
+      return;
+    }
+    if (!isSupportedVideoContentType(file.type)) {
       return;
     }
 
@@ -54,6 +81,7 @@ export default function VideoUploadModal() {
       const { signedVideoUrl, signedThumbnailUrl, id } = await getSignedUrl.mutateAsync({
         key: file.name,
         contentType: file.type,
+        size: file.size,
       });
       videoId = id;
       await axios.put(signedVideoUrl, file.slice(), {
@@ -129,6 +157,9 @@ export default function VideoUploadModal() {
                         {file.name}
                       </span>
                       <span className="mt-1 text-xs text-muted-foreground">Clique para escolher outro arquivo</span>
+                      <span className="mt-1 text-xs text-muted-foreground">
+                        {formatVideoBytes(file.size)} de {formatVideoBytes(MAX_VIDEO_BYTES)}
+                      </span>
                     </>
                   ) : (
                     <>
@@ -136,7 +167,9 @@ export default function VideoUploadModal() {
                       <span className="mt-3 text-sm font-semibold text-navy-900">
                         Selecione ou arraste um vídeo
                       </span>
-                      <span className="mt-1 text-xs text-muted-foreground">Arquivos MP4 ou WebM</span>
+                      <span className="mt-1 text-xs text-muted-foreground">
+                        Arquivos MP4 ou WebM de até {formatVideoBytes(MAX_VIDEO_BYTES)}
+                      </span>
                     </>
                   )}
                   <input
@@ -148,6 +181,12 @@ export default function VideoUploadModal() {
                     disabled={submitting}
                   />
                 </label>
+
+                {fileError ? (
+                  <p className="mt-2 text-sm text-destructive" role="alert">
+                    {fileError}
+                  </p>
+                ) : null}
 
                 {previewUrl ? (
                   <video

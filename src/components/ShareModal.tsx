@@ -1,6 +1,7 @@
 import { Dialog, Transition } from "@headlessui/react";
 import { Check, Copy, KeyRound, Share2, X } from "lucide-react";
 import { Fragment, useState } from "react";
+import { toast } from "sonner";
 
 import ExpireDateSelectMenu from "~/components/ExpireDateSelectMenu";
 import { ModernSwitch } from "~/components/ModernSwitch";
@@ -19,53 +20,106 @@ export function ShareModal({ video }: Props) {
 
   const setSharingMutation = api.video.setSharing.useMutation({
     onMutate: async ({ videoId, sharing }) => {
-      await utils.video.get.cancel();
+      await Promise.all([
+        utils.video.get.cancel({ videoId }),
+        utils.video.getAll.cancel(),
+      ]);
       const previousValue = utils.video.get.getData({ videoId });
+      const previousVideos = utils.video.getAll.getData();
       if (previousValue?.isOwner) {
         utils.video.get.setData({ videoId }, { ...previousValue, sharing });
       }
-      return { previousValue };
+      utils.video.getAll.setData(undefined, (current) =>
+        current?.map((item) =>
+          item.id === videoId ? { ...item, sharing } : item
+        )
+      );
+      return { previousValue, previousVideos };
     },
-    onError: (error, { videoId }, context) => {
-      if (context?.previousValue) utils.video.get.setData({ videoId }, context.previousValue);
-      console.error(error.message);
+    onSuccess: (_, { sharing }) => {
+      toast.success(
+        sharing ? "Link público ativado" : "Link público desativado"
+      );
+    },
+    onError: (_, { videoId }, context) => {
+      if (context?.previousValue)
+        utils.video.get.setData({ videoId }, context.previousValue);
+      utils.video.getAll.setData(undefined, context?.previousVideos);
+      toast.error("Não foi possível alterar o compartilhamento");
+    },
+    onSettled: (_, __, { videoId }) => {
+      void utils.video.get.invalidate({ videoId });
+      void utils.video.getAll.invalidate();
     },
   });
 
-  const deleteAfterExpirationMutation = api.video.setDeleteAfterLinkExpires.useMutation({
-    onMutate: async ({ videoId, delete_after_link_expires }) => {
-      await utils.video.get.cancel();
-      const previousValue = utils.video.get.getData({ videoId });
-      if (previousValue?.isOwner) {
-        utils.video.get.setData(
-          { videoId },
-          { ...previousValue, delete_after_link_expires }
+  const deleteAfterExpirationMutation =
+    api.video.setDeleteAfterLinkExpires.useMutation({
+      onMutate: async ({ videoId, delete_after_link_expires }) => {
+        await utils.video.get.cancel({ videoId });
+        const previousValue = utils.video.get.getData({ videoId });
+        if (previousValue?.isOwner) {
+          utils.video.get.setData(
+            { videoId },
+            { ...previousValue, delete_after_link_expires }
+          );
+        }
+        return { previousValue };
+      },
+      onSuccess: (_, { delete_after_link_expires }) => {
+        toast.success(
+          delete_after_link_expires
+            ? "Exclusão automática ativada"
+            : "Exclusão automática desativada"
         );
-      }
-      return { previousValue };
-    },
-    onError: (error, { videoId }, context) => {
-      if (context?.previousValue) utils.video.get.setData({ videoId }, context.previousValue);
-      console.error(error.message);
-    },
-  });
+      },
+      onError: (_, { videoId }, context) => {
+        if (context?.previousValue)
+          utils.video.get.setData({ videoId }, context.previousValue);
+        toast.error("Não foi possível alterar a exclusão automática");
+      },
+      onSettled: (_, __, { videoId }) => {
+        void utils.video.get.invalidate({ videoId });
+      },
+    });
 
   const setPinMutation = api.video.setPin.useMutation({
-    onSuccess: async () => {
+    onSuccess: (_, { videoId, pin: nextPin }) => {
+      const pinProtected = nextPin !== null;
+      utils.video.get.setData({ videoId }, (current) =>
+        current?.isOwner ? { ...current, pinProtected } : current
+      );
       setPin("");
-      await utils.video.get.invalidate({ videoId: video.id });
+      toast.success(
+        pinProtected
+          ? video.pinProtected
+            ? "PIN alterado"
+            : "PIN ativado"
+          : "PIN removido"
+      );
+      void utils.video.get.invalidate({ videoId });
     },
+    onError: () => toast.error("Não foi possível salvar o PIN"),
   });
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(window.location.href);
-    setLinkCopied(true);
-    window.setTimeout(() => setLinkCopied(false), 2500);
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setLinkCopied(true);
+      window.setTimeout(() => setLinkCopied(false), 2500);
+    } catch {
+      toast.error("Não foi possível copiar o link");
+    }
   };
 
   return (
     <>
-      <Button type="button" variant="primary" size="sm" onClick={() => setOpen(true)}>
+      <Button
+        type="button"
+        variant="primary"
+        size="sm"
+        onClick={() => setOpen(true)}
+      >
         <Share2 className="h-4 w-4" aria-hidden="true" />
         <span className="hidden sm:inline">Compartilhar</span>
       </Button>
@@ -98,7 +152,9 @@ export function ShareModal({ video }: Props) {
                 <Dialog.Panel className="w-full max-w-lg border border-line bg-white p-5 shadow-xl sm:p-6">
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <p className="text-sm font-semibold text-navy-600">Acesso externo</p>
+                      <p className="text-sm font-semibold text-navy-600">
+                        Acesso externo
+                      </p>
                       <Dialog.Title className="mt-1 text-2xl font-bold text-navy-900">
                         Compartilhar demonstração
                       </Dialog.Title>
@@ -116,13 +172,16 @@ export function ShareModal({ video }: Props) {
 
                   <div className="mt-6 flex items-center justify-between gap-4 border border-line bg-navy-50 p-4">
                     <div>
-                      <p className="text-sm font-semibold text-navy-900">Link público</p>
+                      <p className="text-sm font-semibold text-navy-900">
+                        Link público
+                      </p>
                       <p className="mt-1 text-xs leading-5 text-muted-foreground">
                         Permite que qualquer pessoa com o link assista.
                       </p>
                     </div>
                     <ModernSwitch
                       enabled={video.sharing}
+                      pending={setSharingMutation.isLoading}
                       label="Ativar link público"
                       toggle={() =>
                         setSharingMutation.mutate({
@@ -135,35 +194,60 @@ export function ShareModal({ video }: Props) {
 
                   {video.sharing ? (
                     <div className="mt-4 border border-line p-4">
-                      <Button type="button" className="w-full" onClick={() => void handleCopy()}>
-                        {linkCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                      <Button
+                        type="button"
+                        className="w-full"
+                        onClick={() => void handleCopy()}
+                      >
+                        {linkCopied ? (
+                          <Check className="h-4 w-4" />
+                        ) : (
+                          <Copy className="h-4 w-4" />
+                        )}
                         {linkCopied ? "Link copiado" : "Copiar link público"}
                       </Button>
 
                       <div className="mt-4 border-t border-line pt-4">
                         <div className="flex items-center gap-2 text-sm font-semibold text-navy-900">
                           <KeyRound className="h-4 w-4 text-navy-600" />
-                          {video.pinProtected ? "PIN ativado" : "Proteger com PIN"}
+                          {video.pinProtected
+                            ? "PIN ativado"
+                            : "Proteger com PIN"}
                         </div>
                         <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                          Quem abrir este link precisará informar quatro números.
+                          Quem abrir este link precisará informar quatro
+                          números.
                         </p>
                         <div className="mt-3 flex flex-col gap-2 sm:flex-row">
                           <input
                             value={pin}
-                            onChange={(event) => setPin(event.currentTarget.value.replace(/\D/g, "").slice(0, 4))}
+                            disabled={setPinMutation.isLoading}
+                            onChange={(event) =>
+                              setPin(
+                                event.currentTarget.value
+                                  .replace(/\D/g, "")
+                                  .slice(0, 4)
+                              )
+                            }
                             inputMode="numeric"
                             pattern="\d{4}"
                             maxLength={4}
                             placeholder="0000"
                             aria-label="PIN de quatro números"
-                            className="h-10 min-w-0 flex-1 border border-line bg-white px-3 text-center font-mono tracking-[0.35em] text-navy-900 outline-none focus:border-navy-600 focus:ring-1 focus:ring-navy-600"
+                            className="h-10 min-w-0 flex-1 border border-line bg-white px-3 text-center font-mono tracking-[0.35em] text-navy-900 outline-none transition-[border-color,opacity] duration-150 focus:border-navy-600 focus:ring-1 focus:ring-navy-600 disabled:cursor-wait disabled:opacity-60"
                           />
                           <Button
                             type="button"
                             variant="outline"
-                            disabled={pin.length !== 4 || setPinMutation.isLoading}
-                            onClick={() => setPinMutation.mutate({ videoId: video.id, pin })}
+                            disabled={pin.length !== 4}
+                            loading={
+                              setPinMutation.isLoading &&
+                              setPinMutation.variables?.pin !== null
+                            }
+                            loadingLabel="Salvando PIN…"
+                            onClick={() =>
+                              setPinMutation.mutate({ videoId: video.id, pin })
+                            }
                           >
                             {video.pinProtected ? "Trocar PIN" : "Ativar PIN"}
                           </Button>
@@ -171,7 +255,18 @@ export function ShareModal({ video }: Props) {
                             <Button
                               type="button"
                               variant="ghost"
-                              onClick={() => setPinMutation.mutate({ videoId: video.id, pin: null })}
+                              disabled={setPinMutation.isLoading}
+                              loading={
+                                setPinMutation.isLoading &&
+                                setPinMutation.variables?.pin === null
+                              }
+                              loadingLabel="Removendo…"
+                              onClick={() =>
+                                setPinMutation.mutate({
+                                  videoId: video.id,
+                                  pin: null,
+                                })
+                              }
                             >
                               Remover
                             </Button>
@@ -180,7 +275,9 @@ export function ShareModal({ video }: Props) {
                       </div>
 
                       <div className="mt-4 flex items-center justify-between gap-4 border-t border-line pt-4">
-                        <span className="text-sm font-medium text-navy-900">Expiração do link</span>
+                        <span className="text-sm font-medium text-navy-900">
+                          Expiração do link
+                        </span>
                         <ExpireDateSelectMenu
                           videoId={video.id}
                           shareLinkExpiresAt={video.shareLinkExpiresAt}
@@ -192,11 +289,13 @@ export function ShareModal({ video }: Props) {
                         </span>
                         <ModernSwitch
                           enabled={video.delete_after_link_expires}
+                          pending={deleteAfterExpirationMutation.isLoading}
                           label="Excluir vídeo após expiração"
                           toggle={() =>
                             deleteAfterExpirationMutation.mutate({
                               videoId: video.id,
-                              delete_after_link_expires: !video.delete_after_link_expires,
+                              delete_after_link_expires:
+                                !video.delete_after_link_expires,
                             })
                           }
                         />
