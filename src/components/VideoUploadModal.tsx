@@ -7,7 +7,7 @@ import { type ChangeEvent, Fragment, useEffect, useRef, useState } from "react";
 
 import uploadVideoModalOpen from "~/atoms/uploadVideoModalOpen";
 import { Button } from "~/components/ui/Button";
-import generateThumbnail from "~/utils/generateThumbnail";
+import generateThumbnail, { getMediaErrorMessage } from "~/utils/generateThumbnail";
 import { api } from "~/utils/api";
 import {
   formatVideoBytes,
@@ -23,12 +23,14 @@ export default function VideoUploadModal() {
   const [file, setFile] = useState<File>();
   const [fileError, setFileError] = useState<string>();
   const [previewUrl, setPreviewUrl] = useState<string>();
+  const [previewReady, setPreviewReady] = useState(false);
   const getSignedUrl = api.video.getUploadUrl.useMutation();
   const abortUpload = api.video.abortUpload.useMutation();
   const apiUtils = api.useContext();
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
+    setPreviewReady(false);
     if (!file) {
       setPreviewUrl(undefined);
       return;
@@ -78,6 +80,8 @@ export default function VideoUploadModal() {
     setSubmitting(true);
     let videoId: string | undefined;
     try {
+      if (!videoRef.current) throw new Error("Prévia do vídeo indisponível");
+      const thumbnail = await generateThumbnail(videoRef.current);
       const { signedVideoUrl, signedThumbnailUrl, id } = await getSignedUrl.mutateAsync({
         key: file.name,
         contentType: file.type,
@@ -87,8 +91,7 @@ export default function VideoUploadModal() {
       await axios.put(signedVideoUrl, file.slice(), {
         headers: { "Content-Type": file.type },
       });
-      if (!videoRef.current) throw new Error("Prévia do vídeo indisponível");
-      await axios.put(signedThumbnailUrl, await generateThumbnail(videoRef.current), {
+      await axios.put(signedThumbnailUrl, thumbnail, {
         headers: { "Content-Type": "image/png" },
       });
       setOpen(false);
@@ -97,7 +100,11 @@ export default function VideoUploadModal() {
     } catch (error) {
       if (videoId) await abortUpload.mutateAsync({ videoId }).catch(console.error);
       console.error(error);
-      alert("Não foi possível enviar o vídeo. Tente novamente.");
+      setFileError(
+        error instanceof Error && !axios.isAxiosError(error)
+          ? error.message
+          : "Não foi possível enviar o vídeo. Tente novamente."
+      );
     } finally {
       setSubmitting(false);
       void apiUtils.video.getAll.invalidate();
@@ -196,6 +203,8 @@ export default function VideoUploadModal() {
                     preload="auto"
                     muted
                     playsInline
+                    onLoadedData={() => setPreviewReady(true)}
+                    onError={() => setFileError(getMediaErrorMessage(videoRef.current))}
                   />
                 ) : null}
 
@@ -203,7 +212,7 @@ export default function VideoUploadModal() {
                   <Button type="button" variant="outline" onClick={closeModal} disabled={submitting}>
                     Cancelar
                   </Button>
-                  <Button type="button" onClick={() => void handleSubmit()} disabled={!file || submitting}>
+                  <Button type="button" onClick={() => void handleSubmit()} disabled={!file || !previewReady || submitting}>
                     {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
                     {submitting ? "Enviando..." : "Enviar vídeo"}
                   </Button>

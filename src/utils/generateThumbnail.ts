@@ -1,6 +1,18 @@
 const MEDIA_TIMEOUT_MS = 8000;
 
+export function getMediaErrorMessage(video: HTMLVideoElement | null | undefined): string {
+  const code = video?.error?.code;
+  if (code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED || code === MediaError.MEDIA_ERR_DECODE) {
+    return "O navegador não consegue reproduzir este vídeo (codec não suportado, ex.: H.265/HEVC). Converta para MP4 H.264 ou WebM.";
+  }
+  return code
+    ? `Não foi possível carregar o vídeo selecionado (código ${code}).`
+    : "Não foi possível carregar o vídeo selecionado.";
+}
+
 export default async function generateThumbnail(video: HTMLVideoElement): Promise<Blob> {
+  if (video.error) throw new Error(getMediaErrorMessage(video));
+
   if (video.readyState < HTMLMediaElement.HAVE_METADATA || !Number.isFinite(video.duration)) {
     video.load();
     await waitForMediaEvent(video, "loadedmetadata");
@@ -46,7 +58,7 @@ function waitForMediaEvent(
     };
     const handleError = () => {
       cleanup();
-      reject(new Error("Não foi possível carregar o vídeo selecionado."));
+      reject(new Error(getMediaErrorMessage(video)));
     };
     const cleanup = () => {
       window.clearTimeout(timeout);
