@@ -140,6 +140,7 @@ const VideoPage: NextPage = () => {
                 <VideoPlayer
                   thumbnailUrl={video.thumbnailUrl}
                   video_url={video.video_url}
+                  contentType={video.contentType}
                 />
               ) : (
                 <div className="h-full w-full animate-pulse bg-navy-800" />

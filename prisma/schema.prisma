@@ -28,6 +28,7 @@ model Video {
   linkShareSeo              Boolean   @default(false)
   sharePinHash              String?
   shareAccessVersion        Int       @default(0)
+  contentType               String    @default("video/webm")
   folderId                  String?
   user                      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   folder                    Folder?   @relation(fields: [folderId], references: [id], onDelete: SetNull)

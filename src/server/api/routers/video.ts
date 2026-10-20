@@ -103,6 +103,7 @@ export const videoRouter = createTRPCRouter({
         createdAt: video.createdAt,
         user: video.user,
         video_url: videoUrl,
+        contentType: video.contentType,
         thumbnailUrl,
         folder:
           video.folder && (isOwner || folderShareIsActive)
@@ -129,7 +130,11 @@ export const videoRouter = createTRPCRouter({
     .input(videoUploadInput)
     .mutation(async ({ ctx, input }) => {
       const video = await ctx.prisma.video.create({
-        data: { userId: ctx.session.user.id, title: input.key },
+        data: {
+          userId: ctx.session.user.id,
+          title: input.key,
+          contentType: input.contentType,
+        },
       });
 
       try {

@@ -60,6 +60,7 @@ export default function Recorder({ closeModal, step, setStep }: Props) {
   const discardedRef = useRef(false);
   const durationRef = useRef(0);
   const recordedBytesRef = useRef(0);
+  const recordingTypeRef = useRef<RecordingType>(WEBM_RECORDING_TYPE);
   const [pause, setPause] = useState<boolean>(false);
   const [audioDevices, setAudioDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedDevice, setSelectedDevice] = useState<MediaDeviceInfo | null>(
@@ -149,9 +150,11 @@ export default function Recorder({ closeModal, step, setStep }: Props) {
     }
 
     streamRef.current = mediaStream;
+    recordingTypeRef.current = pickRecordingType();
     recorderRef.current = new RecordRTC(mediaStream, {
       type: "video",
-      mimeType: "video/webm;codecs=vp9",
+      mimeType: recordingTypeRef.current
+        .mimeType as RecordRTC.Options["mimeType"],
       videoBitsPerSecond: selectedProfile.videoBitsPerSecond,
       audioBitsPerSecond: selectedProfile.audioBitsPerSecond,
       timeSlice: RECORDING_TIMESLICE_MS,
@@ -215,7 +218,7 @@ export default function Recorder({ closeModal, step, setStep }: Props) {
     const finishRecording = () => {
       recorder.stopRecording(() => {
         if (discardedRef.current) return;
-        getSeekableBlob(recorder.getBlob(), (fixedBlob) => {
+        const handleBlob = (fixedBlob: Blob) => {
           if (discardedRef.current) return;
           setRecordedBytes(fixedBlob.size);
           recordedBytesRef.current = fixedBlob.size;
@@ -225,7 +228,15 @@ export default function Recorder({ closeModal, step, setStep }: Props) {
               `A gravação terminou com ${formatVideoBytes(fixedBlob.size)} e não pode ser enviada. O limite é ${formatVideoBytes(MAX_VIDEO_BYTES)}.`
             );
           }
-        });
+        };
+        const recordedBlob = recorder.getBlob();
+        const { contentType } = recordingTypeRef.current;
+        if (contentType === "video/webm") {
+          getSeekableBlob(recordedBlob, handleBlob);
+        } else {
+          // MP4 already carries duration/seek metadata; no EBML fix needed.
+          handleBlob(new Blob([recordedBlob], { type: contentType }));
+        }
       });
     };
 
@@ -293,7 +304,9 @@ export default function Recorder({ closeModal, step, setStep }: Props) {
 
   const handleSave = () => {
     if (blob) {
-      const dateString = getRecordingFileName();
+      const dateString = getRecordingFileName(
+        recordingTypeRef.current.extension
+      );
       invokeSaveAsDialog(blob, dateString);
     }
   };
@@ -305,7 +318,8 @@ export default function Recorder({ closeModal, step, setStep }: Props) {
       return;
     }
 
-    const dateString = getRecordingFileName();
+    const { contentType, extension } = recordingTypeRef.current;
+    const dateString = getRecordingFileName(extension);
     setSubmitting(true);
     let videoId: string | undefined;
 
@@ -313,13 +327,13 @@ export default function Recorder({ closeModal, step, setStep }: Props) {
       const { signedVideoUrl, signedThumbnailUrl, id } =
         await getSignedUrl.mutateAsync({
           key: dateString,
-          contentType: "video/webm",
+          contentType,
           size: blob.size,
         });
       videoId = id;
 
       await axios.put(signedVideoUrl, blob.slice(), {
-        headers: { "Content-Type": "video/webm" },
+        headers: { "Content-Type": contentType },
       });
       await axios.put(
         signedThumbnailUrl,
@@ -607,7 +621,37 @@ export default function Recorder({ closeModal, step, setStep }: Props) {
   );
 }
 
-function getRecordingFileName() {
+function getRecordingFileName(extension: RecordingType["extension"]) {
   const date = new Intl.DateTimeFormat("pt-BR").format(new Date()).replaceAll("/", "-");
-  return `Demonstração Agilize - ${date}.webm`;
+  return `Demonstração Agilize - ${date}.${extension}`;
+}
+
+interface RecordingType {
+  mimeType: string;
+  contentType: "video/mp4" | "video/webm";
+  extension: "mp4" | "webm";
+}
+
+const WEBM_RECORDING_TYPE: RecordingType = {
+  mimeType: "video/webm;codecs=vp9",
+  contentType: "video/webm",
+  extension: "webm",
+};
+
+// MP4/H.264 plays on every mobile browser (iOS Safari can't reliably decode
+// VP9 WebM), so prefer it whenever the browser can record it.
+const RECORDING_TYPES: RecordingType[] = [
+  { mimeType: "video/mp4;codecs=avc1,opus", contentType: "video/mp4", extension: "mp4" },
+  { mimeType: "video/mp4;codecs=avc1,mp4a", contentType: "video/mp4", extension: "mp4" },
+  { mimeType: "video/mp4", contentType: "video/mp4", extension: "mp4" },
+  WEBM_RECORDING_TYPE,
+  { mimeType: "video/webm", contentType: "video/webm", extension: "webm" },
+];
+
+function pickRecordingType(): RecordingType {
+  if (typeof MediaRecorder === "undefined") return WEBM_RECORDING_TYPE;
+  return (
+    RECORDING_TYPES.find((type) => MediaRecorder.isTypeSupported(type.mimeType)) ??
+    WEBM_RECORDING_TYPE
+  );
 }

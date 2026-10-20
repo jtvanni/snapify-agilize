@@ -15,10 +15,15 @@ import { VideoLayout } from "./VideoLayout";
 
 interface Props {
   video_url: string;
+  contentType?: string;
   thumbnailUrl?: string;
 }
 
-export default function VideoPlayer({ video_url, thumbnailUrl }: Props) {
+export default function VideoPlayer({
+  video_url,
+  contentType = "video/webm",
+  thumbnailUrl,
+}: Props) {
   const player = useRef<MediaPlayerInstance>(null);
 
   function onProviderChange(provider: MediaProviderAdapter | null) {
@@ -36,7 +41,7 @@ export default function VideoPlayer({ video_url, thumbnailUrl }: Props) {
       src={[
         {
           src: video_url,
-          type: "video/webm",
+          type: contentType === "video/mp4" ? "video/mp4" : "video/webm",
         },
       ]}
       crossOrigin
