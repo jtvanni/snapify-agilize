@@ -16,7 +16,6 @@ import recordVideoModalOpen from "~/atoms/recordVideoModalOpen";
 import uploadVideoModalOpen from "~/atoms/uploadVideoModalOpen";
 import { getServerAuthSession } from "~/server/auth";
 import { api } from "~/utils/api";
-import { getTime } from "~/utils/getTime";
 
 const VideoList: NextPage = () => {
   const [, setRecordOpen] = useAtom(recordVideoModalOpen);
@@ -221,7 +220,6 @@ interface VideoCardProps {
   title: string;
   id: string;
   thumbnailUrl: string;
-  createdAt: Date;
   prefetch: () => Promise<unknown>;
 }
 
@@ -229,7 +227,6 @@ const VideoCard = ({
   title,
   id,
   thumbnailUrl,
-  createdAt,
   prefetch,
 }: VideoCardProps) => (
   <Link
@@ -250,13 +247,10 @@ const VideoCard = ({
           unoptimized
         />
       </div>
-      <div className="min-h-[92px] border-t border-line p-4">
+      <div className="min-h-[72px] border-t border-line p-4">
         <h2 className="line-clamp-2 text-sm font-semibold leading-5 text-foreground">
           {title}
         </h2>
-        <p className="mt-2 text-xs text-muted-foreground">
-          {getTime(createdAt)}
-        </p>
       </div>
     </article>
   </Link>
@@ -265,9 +259,8 @@ const VideoCard = ({
 const VideoCardSkeleton = () => (
   <div className="animate-pulse bg-white" aria-hidden="true">
     <div className="aspect-video bg-navy-100" />
-    <div className="min-h-[92px] border-t border-line p-4">
+    <div className="min-h-[72px] border-t border-line p-4">
       <div className="h-4 w-4/5 bg-navy-100" />
-      <div className="mt-3 h-3 w-1/3 bg-navy-100" />
     </div>
   </div>
 );

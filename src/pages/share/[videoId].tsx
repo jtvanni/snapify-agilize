@@ -15,7 +15,6 @@ import { Button } from "~/components/ui/Button";
 import VideoMoreMenu from "~/components/VideoMoreMenu";
 import VideoPlayer from "~/components/VideoPlayer";
 import { api } from "~/utils/api";
-import { getTime } from "~/utils/getTime";
 
 const VideoPage: NextPage = () => {
   const router = useRouter();
@@ -155,14 +154,10 @@ const VideoPage: NextPage = () => {
                   <h1 className="break-words text-xl font-bold text-navy-900 sm:text-2xl">
                     {video.title}
                   </h1>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {getTime(video.createdAt)}
-                  </p>
                 </>
               ) : (
                 <div className="animate-pulse">
                   <div className="h-6 w-72 max-w-full bg-navy-100" />
-                  <div className="mt-2 h-4 w-24 bg-navy-100" />
                 </div>
               )}
             </div>

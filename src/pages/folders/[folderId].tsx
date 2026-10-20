@@ -13,7 +13,6 @@ import ProfileMenu from "~/components/ProfileMenu";
 import { ShareUnlock } from "~/components/ShareUnlock";
 import { Button } from "~/components/ui/Button";
 import { api } from "~/utils/api";
-import { getTime } from "~/utils/getTime";
 
 const FolderPage: NextPage = () => {
   const router = useRouter();
@@ -172,13 +171,10 @@ const FolderPage: NextPage = () => {
                         className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.015]"
                       />
                     </div>
-                    <div className="min-h-[92px] border-t border-line p-4">
+                    <div className="min-h-[72px] border-t border-line p-4">
                       <h2 className="line-clamp-2 text-sm font-semibold leading-5">
                         {video.title}
                       </h2>
-                      <p className="mt-2 text-xs text-muted-foreground">
-                        {getTime(video.createdAt)}
-                      </p>
                     </div>
                   </article>
                 </Link>
